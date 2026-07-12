@@ -31,8 +31,12 @@
         </div>
         <div class="form-group" style="text-align:left;margin-bottom:2rem;">
           <label for="login-password">Password</label>
-          <input type="password" id="login-password" class="form-control" placeholder="Masukkan password" required
-            autocomplete="current-password">
+          <div style="position: relative; width: 100%;">
+            <input type="password" id="login-password" class="form-control" placeholder="Masukkan password" required
+              autocomplete="current-password" style="padding-right: 2.5rem;">
+            <button type="button" onclick="togglePasswordVisibility('login-password', this)"
+              style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary); font-size: 1.1rem; padding: 4px; display: flex; align-items: center; justify-content: center; line-height: 1;">👁️</button>
+          </div>
         </div>
         <button type="submit" class="btn btn-primary" style="width:100%;">Masuk</button>
       </form>
@@ -1408,7 +1412,11 @@
             required placeholder="Username untuk login"></div>
         <div id="user-password-group" class="form-group">
           <label>Password</label>
-          <input type="password" id="user-master-password" class="form-control" placeholder="Password akun">
+          <div style="position: relative; width: 100%;">
+            <input type="password" id="user-master-password" class="form-control" placeholder="Password akun" style="padding-right: 2.5rem;" autocomplete="new-password">
+            <button type="button" onclick="togglePasswordVisibility('user-master-password', this)"
+              style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary); font-size: 1.1rem; padding: 4px; display: flex; align-items: center; justify-content: center; line-height: 1;">👁️</button>
+          </div>
           <span class="form-hint">Biarkan kosong jika tidak ingin mengubah password (mode edit)</span>
         </div>
         <div class="form-group"><label>Peran / Jabatan</label>
@@ -1629,14 +1637,14 @@
   <script src="js/modules/master-penyadap.js?v=5"></script>
   <script src="js/modules/master-penugasan.js?v=5"></script>
   <script src="js/modules/master-anak-petak.js?v=5"></script>
-  <script src="js/modules/master-user.js?v=7"></script>
+  <script src="js/modules/master-user.js?v=9"></script>
   <script src="js/modules/master-import.js?v=9"></script>
   <script src="js/modules/target.js?v=5"></script>
   <script src="js/modules/realisasi.js?v=1"></script>
   <script src="js/modules/dashboard.js?v=11"></script>
   <script src="js/modules/master.js?v=5"></script>
   <script src="js/modules/laporan.js?v=2"></script>
-  <script src="js/app.js?v=6"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 
 </html>
