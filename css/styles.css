@@ -206,7 +206,7 @@ body {
   gap: 1rem;
 }
 .metric-card    { display: flex; flex-direction: column; gap: .75rem; }
-.metric-header  { display: flex; justify-content: space-between; align-items: flex-start; }
+.metric-header  { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
 .metric-title   { font-size: .8rem; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: .05em; }
 .metric-icon    { font-size: 1.4rem; opacity: .7; }
 .metric-value   { font-size: 2rem; font-weight: 700; color: var(--primary); }
@@ -391,6 +391,7 @@ tbody td {
   font-weight: 600;
   letter-spacing: .04em;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .badge-success  { background: rgba(64,192,87,.15);  color: #40c057; }
 .badge-danger   { background: rgba(255,107,107,.15); color: #ff6b6b; }

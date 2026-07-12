@@ -3,13 +3,98 @@
  * Coordinates Authentication, Session Management, RBAC Filters, User CRUD, and Audits.
  */
 
+// Pure JS SHA-256 Implementation for non-secure contexts (HTTP)
+function sha256_js(ascii) {
+  function rightRotate(value, amount) {
+    return (value >>> amount) | (value << (32 - amount));
+  }
+  
+  var mathPow = Math.pow;
+  var maxWord = mathPow(2, 32);
+  var lengthProperty = 'length';
+  var i, j; 
+
+  var result = '';
+  var words = [];
+  var asciiLength = ascii[lengthProperty] * 8;
+  
+  var hash = sha256_js.h = sha256_js.h || [];
+  var k = sha256_js.k = sha256_js.k || [];
+  var primeCounter = k[lengthProperty];
+
+  var isCandidate = {};
+  for (var candidate = 2; primeCounter < 64; candidate++) {
+    if (!isCandidate[candidate]) {
+      for (i = 0; i < 313; i += candidate) {
+        isCandidate[i] = 1;
+      }
+      hash[primeCounter] = (mathPow(candidate, .5) * maxWord) | 0;
+      k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+    }
+  }
+  
+  ascii += '\x80';
+  while (ascii[lengthProperty] % 64 - 56) ascii += '\x00';
+  for (i = 0; i < ascii[lengthProperty]; i++) {
+    j = ascii.charCodeAt(i);
+    if (j >> 8) return; // ASCII-only check
+    words[i >> 2] |= j << ((3 - i % 4) * 8);
+  }
+  words[words[lengthProperty]] = ((asciiLength / maxWord) | 0);
+  words[words[lengthProperty]] = (asciiLength | 0);
+  
+  var h = hash.slice(0);
+  
+  for (j = 0; j < words[lengthProperty]; ) {
+    var w = words.slice(j, j += 16);
+    var oldHash = h.slice(0);
+    
+    for (i = 0; i < 64; i++) {
+      var wItem = w[i];
+      if (i >= 16) {
+        var s0 = rightRotate(w[i - 15], 7) ^ rightRotate(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        var s1 = rightRotate(w[i - 2], 17) ^ rightRotate(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        wItem = w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      
+      var ch = (h[4] & h[5]) ^ (~h[4] & h[6]);
+      var maj = (h[0] & h[1]) ^ (h[0] & h[2]) ^ (h[1] & h[2]);
+      var temp1 = (h[7] + (rightRotate(h[4], 6) ^ rightRotate(h[4], 11) ^ rightRotate(h[4], 25)) + ch + k[i] + wItem) | 0;
+      var temp2 = ((rightRotate(h[0], 2) ^ rightRotate(h[0], 13) ^ rightRotate(h[0], 22)) + maj) | 0;
+      
+      h = [ (temp1 + temp2) | 0 ].concat(h);
+      h[4] = (h[4] + temp1) | 0;
+      h.pop();
+    }
+    
+    for (i = 0; i < 8; i++) {
+      h[i] = (h[i] + oldHash[i]) | 0;
+    }
+  }
+  
+  for (i = 0; i < 8; i++) {
+    var hex = (h[i] >>> 0).toString(16);
+    while (hex[lengthProperty] < 8) hex = '0' + hex;
+    result += hex;
+  }
+  return result;
+}
+
 // Helper to hash passwords locally using SHA-256
 async function hashPassword(password) {
   if (!password) return '';
-  const msgUint8 = new TextEncoder().encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  try {
+    if (window.crypto && window.crypto.subtle) {
+      const msgUint8 = new TextEncoder().encode(password);
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch (e) {
+    console.warn('[hashPassword] crypto.subtle failed, falling back to pure JS hash:', e);
+  }
+  // Fallback to pure JS SHA-256
+  return sha256_js(password);
 }
 
 // Generate client-side UUID v4
@@ -19,6 +104,20 @@ function generateUUID() {
     return v.toString(16);
   });
 }
+
+// Toggle password visibility between text and password types
+function togglePasswordVisibility(inputId, btnEl) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    btnEl.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btnEl.textContent = '👁️';
+  }
+}
+window.togglePasswordVisibility = togglePasswordVisibility;
 
 class SipenaApp {
   constructor() {

@@ -172,7 +172,17 @@ const MasterUser = (() => {
     document.getElementById('user-rph-group').style.display = 'none';
     document.getElementById('user-scope-group').style.display = 'none';
     document.getElementById('user-password-group').style.display = 'block';
-    document.getElementById('user-master-password').required = true;
+    
+    const pwdInput = document.getElementById('user-master-password');
+    pwdInput.value = '';
+    pwdInput.placeholder = 'Password akun baru';
+    pwdInput.type = 'password';
+    pwdInput.required = true;
+    const toggleBtn = pwdInput.nextElementSibling;
+    if (toggleBtn && toggleBtn.tagName === 'BUTTON') {
+      toggleBtn.textContent = '👁️';
+    }
+
     U().openModal('user-master-modal');
   }
 
@@ -185,7 +195,17 @@ const MasterUser = (() => {
     document.getElementById('user-master-username').value = row.username;
     document.getElementById('user-role-select').value     = row.role;
     document.getElementById('user-master-status').value   = row.status;
-    document.getElementById('user-master-password').required = false;
+    
+    const pwdInput = document.getElementById('user-master-password');
+    pwdInput.value = '';
+    pwdInput.placeholder = '•••••••• (Tetap aman di database, isi jika ingin diganti)';
+    pwdInput.type = 'password';
+    pwdInput.required = false;
+    const toggleBtn = pwdInput.nextElementSibling;
+    if (toggleBtn && toggleBtn.tagName === 'BUTTON') {
+      toggleBtn.textContent = '👁️';
+    }
+
     document.getElementById('user-master-modal-title').textContent = 'Edit Pengguna';
     await _loadScopeSelect(row.role, row.scope || '');
     U().openModal('user-master-modal');
