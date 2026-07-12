@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sipena-lite-v9';
+const CACHE_NAME = 'sipena-lite-v12';
 const ASSETS = [
   './',
   './index.html',

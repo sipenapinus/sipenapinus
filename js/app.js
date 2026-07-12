@@ -742,6 +742,100 @@ class SipenaApp {
   editPenyadap(id) {
     this.showToast(`Mengedit penyadap ${id} (Modul berikutnya)`, 'warning');
   }
+
+  /**
+   * Backs up the entire IndexedDB database into a single JSON file.
+   */
+  async backupDatabase() {
+    try {
+      this.showToast('Memulai pencadangan data...', 'info');
+      
+      const stores = [
+        'meta', 'users', 'bkph', 'rph', 'tpg', 'petak', 'anak_petak',
+        'penyadap_master', 'penugasan', 'ro', 'realisasi', 'kehadiran',
+        'monitoring'
+      ];
+      
+      const backupData = {};
+      
+      for (const store of stores) {
+        backupData[store] = await window.db.getAll(store);
+      }
+      
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_sipena_lite_${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      this.showToast('Cadangan database berhasil diunduh!', 'success');
+    } catch (err) {
+      console.error('[Backup Error]', err);
+      this.showToast('Gagal mencadangkan data: ' + err.message, 'danger');
+    }
+  }
+
+  /**
+   * Restores the database from a single JSON backup file.
+   */
+  async restoreDatabase(file) {
+    if (!file) return;
+    
+    if (!confirm('Apakah Anda yakin ingin memulihkan seluruh data dari file ini?\nSemua data lokal Anda saat ini akan dihapus dan digantikan oleh isi file cadangan.')) {
+      return;
+    }
+    
+    try {
+      this.showToast('Membaca file cadangan...', 'info');
+      
+      const text = await file.text();
+      const backupData = JSON.parse(text);
+      
+      // Basic validation: check if it has the required stores as keys
+      const requiredStores = ['users', 'rph', 'tpg', 'petak'];
+      const isValid = requiredStores.every(store => Array.isArray(backupData[store]));
+      
+      if (!isValid) {
+        throw new Error('Format file cadangan tidak valid atau data tidak lengkap.');
+      }
+      
+      this.showToast('Membersihkan database lama...', 'info');
+      
+      const stores = [
+        'meta', 'users', 'bkph', 'rph', 'tpg', 'petak', 'anak_petak',
+        'penyadap_master', 'penugasan', 'ro', 'realisasi', 'kehadiran',
+        'monitoring'
+      ];
+      
+      for (const store of stores) {
+        await window.db.clearStore(store);
+      }
+      
+      this.showToast('Menulis data cadangan...', 'info');
+      
+      for (const store of Object.keys(backupData)) {
+        if (stores.includes(store) && Array.isArray(backupData[store])) {
+          if (backupData[store].length > 0) {
+            await window.db.putMany(store, backupData[store]);
+          }
+        }
+      }
+      
+      localStorage.setItem('sipena_skip_seed', '1');
+      
+      alert('Pemulihan database berhasil! Aplikasi akan memuat ulang.');
+      location.reload();
+    } catch (err) {
+      console.error('[Restore Error]', err);
+      this.showToast('Gagal memulihkan database: ' + err.message, 'danger');
+    }
+  }
 }
 
 // Instantiate globally

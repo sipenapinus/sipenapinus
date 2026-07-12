@@ -668,21 +668,9 @@ const MasterImport = (() => {
     const errors = [];
     if (!row.nama_lengkap) errors.push(_err(rowNum, 'nama_lengkap', 'Nama lengkap wajib diisi'));
     if (!row.username)     errors.push(_err(rowNum, 'username',     'Username wajib diisi'));
-    
-    let password = String(row.password || '').trim();
-    if (!password) {
-      const cleanUsername = String(row.username || 'user').trim().toLowerCase();
-      password = cleanUsername + '123';
-      if (password.length < 6) password = password.padEnd(6, '0');
-    }
+    if (!row.password)     errors.push(_err(rowNum, 'password',     'Password wajib diisi'));
 
-    let role = String(row.role || 'mandor').trim().toLowerCase();
-    if (role.includes('admin')) role = 'admin';
-    else if (role.includes('asper') || role.includes('kbph') || role.includes('bkph')) role = 'bkph';
-    else if (role.includes('krph')) role = 'krph';
-    else if (role.includes('tpg') || role.includes('mandor tpg')) role = 'tpg';
-    else if (role.includes('sadap') || role.includes('mandor')) role = 'mandor';
-
+    const role = String(row.role || 'mandor').trim().toLowerCase();
     const validRoles = ['admin', 'bkph', 'krph', 'tpg', 'mandor'];
     if (row.role && !validRoles.includes(role))
       errors.push(_err(rowNum, 'role', `Role tidak valid: "${row.role}". Pilih: ${validRoles.join(', ')}`));
@@ -702,7 +690,7 @@ const MasterImport = (() => {
     if (errors.length) return { errors };
 
     const _hp = typeof window.hashPassword === 'function' ? window.hashPassword : hashPassword;
-    const password_hash = await _hp(password);
+    const password_hash = await _hp(String(row.password));
     return { record: {
       id: U().uuid(),
       nama_lengkap: String(row.nama_lengkap).trim(),

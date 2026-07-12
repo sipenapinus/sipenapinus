@@ -7,7 +7,7 @@
   <title>SIPENA Pinus — Sistem Informasi Pengelolaan Penyadapan Pinus</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#101c15">
-  <link rel="stylesheet" href="css/styles.css?v=4">
+  <link rel="stylesheet" href="css/styles.css?v=5">
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
   <!-- SheetJS for Excel import/export -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -1038,6 +1038,27 @@
             </div>
           </div>
 
+          <!-- Backup & Restore Card -->
+          <div class="card" style="margin-top:2rem; border-left: 4px solid var(--primary);">
+            <h3
+              style="margin-bottom:1rem;font-size:1.1rem;color:var(--primary);display:flex;align-items:center;gap:0.5rem;">
+              💾 Cadangkan &amp; Pulihkan Database (Satu File)
+            </h3>
+            <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:1.5rem;">
+              Fitur ini digunakan untuk mencadangkan seluruh isi database lokal aplikasi (termasuk RPH, TPG, Petak,
+              Penyadap, Target, Realisasi, dan Pengguna) ke dalam satu berkas teks (.json). File ini dapat dikirim ke
+              HP/perangkat lain untuk dipulihkan secara instan.
+            </p>
+            <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
+              <button class="btn btn-primary" onclick="app.backupDatabase()">📥 Cadangkan Seluruh Data (Backup)</button>
+              <label class="btn btn-secondary" style="margin:0;cursor:pointer;">
+                📤 Pulihkan Seluruh Data (Restore)
+                <input type="file" accept=".json" style="display:none;"
+                  onchange="app.restoreDatabase(this.files[0]);this.value=''">
+              </label>
+            </div>
+          </div>
+
           <script>
             (function () {
               // Tampilkan status mode
@@ -1609,13 +1630,13 @@
   <script src="js/modules/master-penugasan.js?v=5"></script>
   <script src="js/modules/master-anak-petak.js?v=5"></script>
   <script src="js/modules/master-user.js?v=7"></script>
-  <script src="js/modules/master-import.js?v=8"></script>
+  <script src="js/modules/master-import.js?v=9"></script>
   <script src="js/modules/target.js?v=5"></script>
   <script src="js/modules/realisasi.js?v=1"></script>
   <script src="js/modules/dashboard.js?v=11"></script>
   <script src="js/modules/master.js?v=5"></script>
   <script src="js/modules/laporan.js?v=2"></script>
-  <script src="js/app.js?v=5"></script>
+  <script src="js/app.js?v=6"></script>
 </body>
 
 </html>
