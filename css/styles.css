@@ -601,7 +601,7 @@ code {
     transition: transform .3s ease;
   }
   .app-sidebar.active { transform: translateX(0); }
-  .main-layout { margin-left: 0; }
+  .main-layout { margin-left: 0; width: 100%; }
   .mobile-menu-btn { display: block; }
   .form-grid-2 { grid-template-columns: 1fr; }
 }

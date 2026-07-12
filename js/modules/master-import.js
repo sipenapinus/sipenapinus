@@ -325,7 +325,7 @@ const MasterImport = (() => {
     const kodeBkph = String(row.kode_bkph || '').trim().toUpperCase();
     const kode     = String(row.kode || '').trim().toUpperCase();
     const nama     = String(row.nama || '').trim();
-    const status   = String(row.status || 'Aktif').trim();
+    let status     = String(row.status || 'aktif').trim();
 
     // Cari BKPH berdasarkan kode_bkph
     const bkph = data.bkph_all.find(b => b.kode_bkph === kodeBkph);
@@ -350,9 +350,14 @@ const MasterImport = (() => {
 
     if (!nama) errors.push(_err(rowNum, 'nama', 'Nama RPH wajib diisi'));
 
-    const validStatus = ['Aktif', 'Tidak Aktif'];
-    if (status && !validStatus.includes(status))
+    const cleanStatus = status.toLowerCase().replace(/[\s_-]/g, '');
+    if (cleanStatus === 'aktif' || cleanStatus === 'active') {
+      status = 'aktif';
+    } else if (cleanStatus === 'tidakaktif' || cleanStatus === 'nonaktif' || cleanStatus === 'inactive') {
+      status = 'nonaktif';
+    } else {
       errors.push(_err(rowNum, 'status', `Status tidak valid: "${status}". Pilih: Aktif | Tidak Aktif`));
+    }
 
     if (errors.length) return { errors };
     return { record: {
@@ -371,7 +376,7 @@ const MasterImport = (() => {
     const kodeRph = String(row.kode_rph || '').trim().toUpperCase();
     const kode    = String(row.kode || '').trim().toUpperCase();
     const nama    = String(row.nama || '').trim();
-    const status  = String(row.status || 'Aktif').trim();
+    let status    = String(row.status || 'aktif').trim();
 
     // Cari RPH berdasarkan kode
     const rph = data.rph_all.find(r => r.kode === kodeRph);
@@ -395,9 +400,14 @@ const MasterImport = (() => {
 
     if (!nama) errors.push(_err(rowNum, 'nama', 'Nama TPG wajib diisi'));
 
-    const validStatus = ['Aktif', 'Tidak Aktif'];
-    if (status && !validStatus.includes(status))
+    const cleanStatus = status.toLowerCase().replace(/[\s_-]/g, '');
+    if (cleanStatus === 'aktif' || cleanStatus === 'active') {
+      status = 'aktif';
+    } else if (cleanStatus === 'tidakaktif' || cleanStatus === 'nonaktif' || cleanStatus === 'inactive') {
+      status = 'nonaktif';
+    } else {
       errors.push(_err(rowNum, 'status', `Status tidak valid: "${status}". Pilih: Aktif | Tidak Aktif`));
+    }
 
     if (errors.length) return { errors };
     return { record: {
@@ -416,7 +426,7 @@ const MasterImport = (() => {
     const kode = String(row.kode_bkph || '').trim().toUpperCase();
     const nama = String(row.nama_bkph || '').trim();
     const email = String(row.email || '').trim();
-    const status = String(row.status || 'Aktif').trim();
+    let status = String(row.status || 'Aktif').trim();
 
     if (!kode) {
       errors.push(_err(rowNum, 'kode_bkph', 'Kode BKPH wajib diisi'));
@@ -442,8 +452,12 @@ const MasterImport = (() => {
       }
     }
 
-    const validStatus = ['Aktif', 'Tidak Aktif'];
-    if (status && !validStatus.includes(status)) {
+    const cleanStatus = status.toLowerCase().replace(/[\s_-]/g, '');
+    if (cleanStatus === 'aktif' || cleanStatus === 'active') {
+      status = 'Aktif';
+    } else if (cleanStatus === 'tidakaktif' || cleanStatus === 'nonaktif' || cleanStatus === 'inactive') {
+      status = 'Tidak Aktif';
+    } else {
       errors.push(_err(rowNum, 'status', `Status tidak valid: "${status}". Pilih: Aktif | Tidak Aktif`));
     }
 
@@ -468,9 +482,13 @@ const MasterImport = (() => {
     if (!row.nomor) errors.push(_err(rowNum, 'nomor', 'Nomor penyadap wajib diisi'));
     if (!row.nama)  errors.push(_err(rowNum, 'nama',  'Nama wajib diisi'));
 
+    let status = String(row.status || 'aktif').trim().toLowerCase().replace(/[\s-]/g, '_');
     const validStatus = ['aktif', 'tidak_aktif', 'pindah', 'berhenti'];
-    if (row.status && !validStatus.includes(row.status))
-      errors.push(_err(rowNum, 'status', `Status tidak valid: "${row.status}". Pilih: ${validStatus.join(', ')}`));
+    if (status === 'tidakaktif' || status === 'nonaktif') status = 'tidak_aktif';
+
+    if (status && !validStatus.includes(status)) {
+      errors.push(_err(rowNum, 'status', `Status tidak valid: "${row.status}". Pilih: aktif | tidak_aktif | pindah | berhenti`));
+    }
 
     const dup = data.penyadap_all.find(r => r.nomor === String(row.nomor).toUpperCase());
     if (dup) errors.push(_err(rowNum, 'nomor', `Nomor "${row.nomor}" sudah terdaftar di sistem`));
@@ -482,7 +500,7 @@ const MasterImport = (() => {
       nama: String(row.nama).trim(),
       alamat: String(row.alamat || '').trim(),
       no_hp: String(row.no_hp || '').trim(),
-      status: row.status || 'aktif',
+      status,
       ...U().makeAudit(actor)
     }};
   }
@@ -617,12 +635,22 @@ const MasterImport = (() => {
     if (!row.username)     errors.push(_err(rowNum, 'username',     'Username wajib diisi'));
     if (!row.password)     errors.push(_err(rowNum, 'password',     'Password wajib diisi'));
 
+    const role = String(row.role || 'mandor').trim().toLowerCase();
     const validRoles = ['admin', 'bkph', 'krph', 'tpg', 'mandor'];
-    if (row.role && !validRoles.includes(row.role))
+    if (row.role && !validRoles.includes(role))
       errors.push(_err(rowNum, 'role', `Role tidak valid: "${row.role}". Pilih: ${validRoles.join(', ')}`));
 
     const dup = data.users_all.find(u => u.username === String(row.username).toLowerCase());
     if (dup) errors.push(_err(rowNum, 'username', `Username "${row.username}" sudah digunakan`));
+
+    let status = String(row.status || 'aktif').trim().toLowerCase();
+    if (status === 'aktif' || status === 'active') {
+      status = 'aktif';
+    } else if (status === 'nonaktif' || status === 'tidak aktif' || status === 'inactive') {
+      status = 'nonaktif';
+    } else {
+      errors.push(_err(rowNum, 'status', `Status tidak valid: "${row.status}". Pilih: aktif | nonaktif`));
+    }
 
     if (errors.length) return { errors };
 
@@ -634,9 +662,9 @@ const MasterImport = (() => {
       nip: String(row.nip || '').trim(),
       username: String(row.username).trim().toLowerCase(),
       password_hash,
-      role: row.role || 'mandor',
+      role,
       scope: row.scope ? String(row.scope).trim() : null,
-      status: row.status || 'aktif',
+      status,
       ...U().makeAudit(actor)
     }};
   }
