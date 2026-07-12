@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIPENA Pinus — Sistem Informasi Pengelolaan Penyadapan Pinus</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#101c15">
+  <link rel="stylesheet" href="css/styles.css?v=3">
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+  <!-- SheetJS for Excel import/export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!-- ═══════════════════ LOGIN ═══════════════════ -->
+<div id="login-container" style="display:flex;">
+  <div class="card" style="width:100%;max-width:400px;padding:2.5rem;text-align:center;border-color:rgba(64,192,87,.2);box-shadow:var(--shadow-lg);">
+    <img src="assets/logo.svg" alt="Logo" style="width:75px;height:75px;margin-bottom:1rem;object-fit:contain;">
+    <h2 style="font-size:1.5rem;font-weight:700;margin-bottom:.25rem;">SIPENA Pinus</h2>
+    <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:2rem;">Sistem Informasi Pengelolaan Penyadapan Pinus</p>
+    <form id="login-form" onsubmit="app.handleLogin(event)">
+      <div class="form-group" style="text-align:left;">
+        <label for="login-username">Username</label>
+        <input type="text" id="login-username" class="form-control" placeholder="Masukkan username" required autocomplete="username">
+      </div>
+      <div class="form-group" style="text-align:left;margin-bottom:2rem;">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" class="form-control" placeholder="Masukkan password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Masuk</button>
+    </form>
+    <div style="margin-top:1.5rem;font-size:.75rem;color:var(--text-muted);">SIPENA Pinus v1.0 &bull; Offline First</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MAIN APP ═══════════════════ -->
+<div class="app-container" style="display:none;">
+
+  <!-- Sidebar -->
+  <aside class="app-sidebar">
+    <div class="brand-section">
+      <img class="brand-logo" src="assets/logo.svg" alt="Logo">
+      <div>
+        <div class="brand-name">SIPENA Pinus</div>
+        <div class="brand-tagline">Perum Perhutani</div>
+      </div>
+    </div>
+
+    <nav style="flex-grow:1;">
+      <ul class="nav-menu">
+        <li><a class="nav-link active" data-section="dashboard"><span class="nav-icon">📊</span> Dashboard</a></li>
+        <li><a class="nav-link" data-section="master"><span class="nav-icon">🗂️</span> Data Master</a></li>
+        <li><a class="nav-link" data-section="target-ro"><span class="nav-icon">📋</span> Target &amp; RO</a></li>
+        <li><a class="nav-link" data-section="realisasi"><span class="nav-icon">🛢️</span> Realisasi Produksi</a></li>
+        <li><a class="nav-link" data-section="laporan"><span class="nav-icon">📄</span> Laporan</a></li>
+        <li><a class="nav-link" data-section="pengaturan"><span class="nav-icon">⚙️</span> Pengaturan</a></li>
+      </ul>
+    </nav>
+
+    <div class="user-widget">
+      <div class="user-avatar" id="avatar-initials">BS</div>
+      <div class="user-info" style="flex-grow:1;">
+        <span class="user-name" id="profile-name">Budi Santoso</span>
+        <span class="user-role" id="profile-role">Administrator BKPH</span>
+      </div>
+      <button onclick="app.handleLogout()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--danger);padding:4px;" title="Keluar">🚪</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-layout">
+    <header class="main-header">
+      <div style="display:flex;align-items:center;gap:1rem;">
+        <button class="mobile-menu-btn" aria-label="Menu">☰</button>
+        <div style="font-weight:500;font-size:.95rem;color:var(--text-secondary);">
+          Lingkup: <strong id="header-scope">BKPH Bantarkawung</strong>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div id="syncIndicator" class="sync-indicator online"><span class="dot blink"></span> Memuat...</div>
+      </div>
+    </header>
+
+    <div class="content-body">
+
+      <!-- ─── DASHBOARD ─── -->
+      <section id="dashboard-section" class="page-section active">
+        <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h2 class="section-title">Dashboard Operasional</h2>
+            <p class="section-subtitle">Pusat monitoring operasional getah pinus berjenjang</p>
+          </div>
+        </div>
+
+        <!-- Toolbar Filter & Pencarian Dashboard -->
+        <div class="card" style="margin-bottom:1.5rem;padding:1rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:center;">
+          <!-- Filter Tahun -->
+          <div style="display:flex;flex-direction:column;gap:.25rem;">
+            <label style="font-size:.75rem;font-weight:600;color:var(--text-secondary);">Tahun</label>
+            <select id="dash-filter-tahun" class="form-control" style="margin:0;min-width:100px;" onchange="DashboardModule.setFilter('tahun', parseInt(this.value))">
+              <option value="2026" selected>2026</option>
+              <option value="2027">2027</option>
+              <option value="2028">2028</option>
+              <option value="2029">2029</option>
+            </select>
+          </div>
+
+          <!-- Filter Bulan -->
+          <div style="display:flex;flex-direction:column;gap:.25rem;">
+            <label style="font-size:.75rem;font-weight:600;color:var(--text-secondary);">Bulan</label>
+            <select id="dash-filter-bulan" class="form-control" style="margin:0;min-width:120px;" onchange="DashboardModule.setFilter('bulan', parseInt(this.value))">
+              <option value="1">Januari</option>
+              <option value="2">Februari</option>
+              <option value="3">Maret</option>
+              <option value="4">April</option>
+              <option value="5">Mei</option>
+              <option value="6">Juni</option>
+              <option value="7" selected>Juli</option>
+              <option value="8">Agustus</option>
+              <option value="9">September</option>
+              <option value="10">Oktober</option>
+              <option value="11">November</option>
+              <option value="12">Desember</option>
+            </select>
+          </div>
+
+          <!-- Filter Periode -->
+          <div style="display:flex;flex-direction:column;gap:.25rem;">
+            <label style="font-size:.75rem;font-weight:600;color:var(--text-secondary);">Periode</label>
+            <select id="dash-filter-periode" class="form-control" style="margin:0;min-width:130px;" onchange="DashboardModule.setFilter('periode', parseInt(this.value))">
+              <option value="1" selected>Periode 1 (1-15)</option>
+              <option value="2">Periode 2 (16-31)</option>
+            </select>
+          </div>
+
+          <!-- Filter Status Warna -->
+          <div style="display:flex;flex-direction:column;gap:.25rem;">
+            <label style="font-size:.75rem;font-weight:600;color:var(--text-secondary);">Status</label>
+            <select id="dash-filter-status" class="form-control" style="margin:0;min-width:130px;" onchange="DashboardModule.setFilter('filterStatus', this.value)">
+              <option value="" selected>Semua Status</option>
+              <option value="green">🟢 Tercapai</option>
+              <option value="yellow">🟡 Perhatian</option>
+              <option value="red">🔴 Tertinggal</option>
+            </select>
+          </div>
+
+          <!-- Pencarian Cepat -->
+          <div style="display:flex;flex-direction:column;gap:.25rem;flex-grow:1;">
+            <label style="font-size:.75rem;font-weight:600;color:var(--text-secondary);">Pencarian Cepat</label>
+            <input type="text" id="dash-search-input" class="form-control" placeholder="Cari Penyadap/Petak/Mandor/TPG..." style="margin:0;" oninput="DashboardModule.setFilter('search', this.value)">
+          </div>
+        </div>
+
+        <!-- Breadcrumbs Navigation -->
+        <div id="dashboard-breadcrumbs" style="margin-bottom:1.5rem;font-size:.9rem;color:var(--text-secondary);background:var(--bg-surface-elevated);padding:.75rem 1rem;border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+          <!-- Rendered by dashboard.js -->
+        </div>
+
+        <!-- Area Render Dashboard Utama -->
+        <div id="dashboard-render-area">
+          <!-- Rendered dynamically by dashboard.js based on Drill Down Level -->
+        </div>
+
+        <!-- Kelengkapan Target Widget (Dashboard Bottom) -->
+        <div class="card" style="margin-top:2rem;">
+          <h3 style="margin-bottom:1rem;font-size:1.1rem;color:var(--primary);display:flex;align-items:center;gap:0.5rem;">
+            📊 Kelengkapan Target Produksi BKPH (2026)
+          </h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:1rem;">
+            <div style="background:var(--bg-surface-elevated);padding:.75rem 1rem;border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+              <div style="font-size:.75rem;color:var(--text-secondary);">Target BKPH</div>
+              <strong id="dash-target-bkph" style="font-size:1rem;color:var(--primary);">Memuat...</strong>
+            </div>
+            <div style="background:var(--bg-surface-elevated);padding:.75rem 1rem;border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+              <div style="font-size:.75rem;color:var(--text-secondary);">Target RPH</div>
+              <strong id="dash-target-rph" style="font-size:1rem;color:var(--primary);">Memuat...</strong>
+            </div>
+            <div style="background:var(--bg-surface-elevated);padding:.75rem 1rem;border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+              <div style="font-size:.75rem;color:var(--text-secondary);">Target TPG</div>
+              <strong id="dash-target-tpg" style="font-size:1rem;color:var(--primary);">Memuat...</strong>
+            </div>
+            <div style="background:var(--bg-surface-elevated);padding:.75rem 1rem;border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+              <div style="font-size:.75rem;color:var(--text-secondary);">Target Mandor</div>
+              <strong id="dash-target-mandor" style="font-size:1rem;color:var(--primary);">Memuat...</strong>
+            </div>
+            <div style="background:var(--bg-surface-elevated);padding:.75rem 1rem;border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+              <div style="font-size:.75rem;color:var(--text-secondary);">Target Penyadap</div>
+              <strong id="dash-target-penyadap" style="font-size:1rem;color:var(--primary);">Memuat...</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:2rem;border-left:4px solid var(--primary);">
+          <h3 style="margin-bottom:.5rem;font-size:1.1rem;">💡 Prinsip Pengelolaan Pinus Perhutani</h3>
+          <p style="font-size:.9rem;color:var(--text-secondary);line-height:1.6;">
+            <strong>Target</strong> melekat pada areal sadap (petak hutan). <strong>RO</strong> dirumuskan per periode berdasarkan kesanggupan penyadap. <strong>Realisasi</strong> adalah berat bersih getah yang disetor ke TPG setelah memperhitungkan mutu dan berat wadah.
+          </p>
+        </div>
+      </section>
+
+      <!-- ─── DATA MASTER ─── -->
+      <section id="master-section" class="page-section">
+        <div class="section-header">
+          <h2 class="section-title">Data Master</h2>
+          <p class="section-subtitle">Kelola data organisasi, wilayah, dan tenaga kerja</p>
+        </div>
+
+        <!-- Master Sub-tabs -->
+        <div class="master-tabs">
+          <button class="btn btn-primary btn-sm master-tab active" data-tab="bkph" onclick="switchMasterTab('bkph')">🏢 BKPH</button>
+          <button class="btn btn-secondary btn-sm master-tab" data-tab="rph" onclick="switchMasterTab('rph')">🌲 RPH</button>
+          <button class="btn btn-secondary btn-sm master-tab" data-tab="tpg" onclick="switchMasterTab('tpg')">🏭 TPG</button>
+          <button class="btn btn-secondary btn-sm master-tab" data-tab="petak" onclick="switchMasterTab('petak')">🗺️ Petak</button>
+          <button class="btn btn-secondary btn-sm master-tab" data-tab="penyadap" onclick="switchMasterTab('penyadap')">👷 Penyadap</button>
+          <button class="btn btn-secondary btn-sm master-tab" data-tab="penugasan" onclick="switchMasterTab('penugasan')">📌 Penugasan</button>
+          <button class="btn btn-secondary btn-sm master-tab" data-tab="user" onclick="switchMasterTab('user')">👤 Pengguna</button>
+        </div>
+
+        <!-- ── BKPH Panel ── -->
+        <div id="tab-bkph" class="master-panel">
+          <div id="bkph-import-errors" class="import-error-panel"></div>
+          <div class="table-toolbar">
+            <input type="text" class="form-control" placeholder="🔍 Cari BKPH..." style="max-width:280px;" oninput="MasterBKPH.onSearch(this.value)">
+            <select class="form-control" style="max-width:180px;" onchange="MasterBKPH.onFilter('filterStatus', this.value)">
+              <option value="">Semua Status</option>
+              <option value="Aktif">Aktif</option>
+              <option value="Tidak Aktif">Tidak Aktif</option>
+              <option value="terhapus">Terhapus (Soft Delete)</option>
+            </select>
+            <div class="toolbar-spacer"></div>
+            <div class="toolbar-actions">
+              <button class="btn btn-secondary btn-sm" onclick="MasterImport.downloadTemplate('bkph')">📋 Template</button>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;">
+                📤 Import <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="MasterImport.importFile('bkph', this.files[0], 'bkph-import-errors')">
+              </label>
+              <button class="btn btn-secondary btn-sm" onclick="MasterBKPH.exportExcel()">📥 Export</button>
+              <button class="btn btn-primary btn-sm" onclick="MasterBKPH.openAdd()">+ Tambah BKPH</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th onclick="MasterBKPH.onSort('kode_bkph')">Kode BKPH</th>
+                    <th onclick="MasterBKPH.onSort('nama_bkph')">Nama BKPH</th>
+                    <th onclick="MasterBKPH.onSort('alamat')">Alamat &amp; Kontak</th>
+                    <th onclick="MasterBKPH.onSort('status')">Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="bkph-tbody"></tbody>
+              </table>
+            </div>
+            <div id="bkph-pagination"></div>
+          </div>
+        </div>
+
+        <!-- ── RPH Panel ── -->
+        <div id="tab-rph" class="master-panel" style="display:none;">
+          <div id="rph-import-errors" class="import-error-panel"></div>
+          <div class="table-toolbar">
+            <input type="text" class="form-control" placeholder="🔍 Cari RPH..." style="max-width:240px;" oninput="MasterRPH.onSearch(this.value)">
+            <select class="form-control" style="max-width:180px;" id="rph-filter-bkph" onchange="MasterRPH.onFilter('filterBkph', this.value)">
+              <option value="">Semua BKPH</option>
+            </select>
+            <select class="form-control" style="max-width:150px;" onchange="MasterRPH.onFilter('filterStatus', this.value)">
+              <option value="">Semua Status</option>
+              <option value="Aktif">Aktif</option>
+              <option value="Tidak Aktif">Tidak Aktif</option>
+              <option value="terhapus">🗑️ Terhapus</option>
+            </select>
+            <div class="toolbar-spacer"></div>
+            <div class="toolbar-actions">
+              <button class="btn btn-secondary btn-sm write-only" onclick="MasterImport.downloadTemplate('rph')">📋 Template</button>
+              <label class="btn btn-secondary btn-sm write-only" style="cursor:pointer;margin:0;">
+                📤 Import <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="MasterImport.importFile('rph', this.files[0], 'rph-import-errors');this.value=''">
+              </label>
+              <button class="btn btn-secondary btn-sm export-btn" onclick="MasterRPH.exportExcel()">📥 Export</button>
+              <button class="btn btn-primary btn-sm write-only" onclick="MasterRPH.openAdd()">+ Tambah RPH</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:50px">No</th>
+                    <th onclick="MasterRPH.onSort('kode')" style="cursor:pointer">Kode ⇕</th>
+                    <th onclick="MasterRPH.onSort('nama')" style="cursor:pointer">Nama RPH ⇕</th>
+                    <th>BKPH</th>
+                    <th onclick="MasterRPH.onSort('keterangan')" style="cursor:pointer">Keterangan ⇕</th>
+                    <th onclick="MasterRPH.onSort('status')" style="cursor:pointer">Status ⇕</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="rph-tbody"></tbody>
+              </table>
+            </div>
+            <div id="rph-pagination"></div>
+          </div>
+        </div>
+
+        <!-- ── TPG Panel ── -->
+        <div id="tab-tpg" class="master-panel" style="display:none;">
+          <div id="tpg-import-errors" class="import-error-panel"></div>
+          <div class="table-toolbar">
+            <input type="text" class="form-control" placeholder="🔍 Cari TPG..." style="max-width:240px;" oninput="MasterTPG.onSearch(this.value)">
+            <select class="form-control" style="max-width:165px;" id="tpg-filter-bkph" onchange="MasterTPG.onFilter('filterBkph', this.value)">
+              <option value="">Semua BKPH</option>
+            </select>
+            <select class="form-control" style="max-width:165px;" id="tpg-filter-rph" onchange="MasterTPG.onFilter('filterRph', this.value)">
+              <option value="">Semua RPH</option>
+            </select>
+            <select class="form-control" style="max-width:150px;" onchange="MasterTPG.onFilter('filterStatus', this.value)">
+              <option value="">Semua Status</option>
+              <option value="Aktif">Aktif</option>
+              <option value="Tidak Aktif">Tidak Aktif</option>
+              <option value="terhapus">🗑️ Terhapus</option>
+            </select>
+            <div class="toolbar-spacer"></div>
+            <div class="toolbar-actions">
+              <button class="btn btn-secondary btn-sm write-only" onclick="MasterImport.downloadTemplate('tpg')">📋 Template</button>
+              <label class="btn btn-secondary btn-sm write-only" style="cursor:pointer;margin:0;">
+                📤 Import <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="MasterImport.importFile('tpg', this.files[0], 'tpg-import-errors');this.value=''">
+              </label>
+              <button class="btn btn-secondary btn-sm export-btn" onclick="MasterTPG.exportExcel()">📥 Export</button>
+              <button class="btn btn-primary btn-sm write-only" onclick="MasterTPG.openAdd()">+ Tambah TPG</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:50px">No</th>
+                    <th onclick="MasterTPG.onSort('kode')" style="cursor:pointer">Kode ⇕</th>
+                    <th onclick="MasterTPG.onSort('nama')" style="cursor:pointer">Nama TPG ⇕</th>
+                    <th>RPH</th>
+                    <th>BKPH</th>
+                    <th onclick="MasterTPG.onSort('keterangan')" style="cursor:pointer">Keterangan ⇕</th>
+                    <th onclick="MasterTPG.onSort('status')" style="cursor:pointer">Status ⇕</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tpg-tbody"></tbody>
+              </table>
+            </div>
+            <div id="tpg-pagination"></div>
+          </div>
+        </div>
+
+        <!-- ── Petak Panel ── -->
+        <div id="tab-petak" class="master-panel" style="display:none;">
+          <div id="petak-import-errors" class="import-error-panel"></div>
+          <div class="table-toolbar">
+            <input type="text" class="form-control" placeholder="🔍 Cari Petak..." style="max-width:240px;" oninput="MasterPetak.onSearch(this.value)">
+            <select class="form-control" style="max-width:180px;" id="petak-filter-rph" onchange="MasterPetak.onFilterRph(this.value)">
+              <option value="">Semua RPH</option>
+            </select>
+            <select class="form-control" style="max-width:180px;" id="petak-filter-tpg" onchange="MasterPetak.onFilter('filterTpg', this.value)">
+              <option value="">Semua TPG</option>
+            </select>
+            <div class="toolbar-spacer"></div>
+            <div class="toolbar-actions">
+              <button class="btn btn-secondary btn-sm" onclick="MasterImport.downloadTemplate('petak')">📋 Template</button>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;">
+                📤 Import <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="MasterImport.importFile('petak', this.files[0], 'petak-import-errors')">
+              </label>
+              <button class="btn btn-secondary btn-sm" onclick="MasterPetak.exportExcel()">📥 Export</button>
+              <button class="btn btn-primary btn-sm" onclick="MasterPetak.openAdd()">+ Tambah Petak</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th onclick="MasterPetak.onSort('nomor')">No. Petak</th>
+                    <th>RPH</th>
+                    <th>TPG</th>
+                    <th>Luas (Ha)</th>
+                    <th>Jumlah Pohon</th>
+                    <th onclick="MasterPetak.onSort('kelas_hutan')">Tahun Tanam</th>
+                    <th onclick="MasterPetak.onSort('keterangan')">Keterangan</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="petak-tbody"></tbody>
+              </table>
+            </div>
+            <div id="petak-pagination"></div>
+          </div>
+        </div>
+
+
+
+        <!-- ── Penyadap Panel ── -->
+        <div id="tab-penyadap" class="master-panel" style="display:none;">
+          <div id="penyadap-import-errors" class="import-error-panel"></div>
+          <div class="table-toolbar">
+            <input type="text" class="form-control" placeholder="🔍 Cari Penyadap..." style="max-width:240px;" oninput="MasterPenyadap.onSearch(this.value)">
+            <select class="form-control" style="max-width:180px;" onchange="MasterPenyadap.onFilter('filterStatus', this.value)">
+              <option value="">Semua Status</option>
+              <option value="aktif">Aktif</option>
+              <option value="tidak_aktif">Tidak Aktif</option>
+              <option value="pindah">Pindah</option>
+              <option value="berhenti">Berhenti</option>
+            </select>
+            <div class="toolbar-spacer"></div>
+            <div class="toolbar-actions">
+              <button class="btn btn-secondary btn-sm" onclick="MasterImport.downloadTemplate('penyadap')">📋 Template</button>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;">
+                📤 Import <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="MasterImport.importFile('penyadap', this.files[0], 'penyadap-import-errors')">
+              </label>
+              <button class="btn btn-secondary btn-sm" onclick="MasterPenyadap.exportExcel()">📥 Export</button>
+              <button class="btn btn-primary btn-sm" onclick="MasterPenyadap.openAdd()">+ Tambah Penyadap</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th onclick="MasterPenyadap.onSort('nomor')">No. Penyadap</th>
+                    <th onclick="MasterPenyadap.onSort('nama')">Nama Lengkap</th>
+                    <th onclick="MasterPenyadap.onSort('alamat')">Alamat</th>
+                    <th onclick="MasterPenyadap.onSort('no_hp')">No. HP</th>
+                    <th onclick="MasterPenyadap.onSort('status')">Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="penyadap-tbody"></tbody>
+              </table>
+            </div>
+            <div id="penyadap-pagination"></div>
+          </div>
+        </div>
+
+        <!-- ── Penugasan Panel ── -->
+        <div id="tab-penugasan" class="master-panel" style="display:none;">
+          <div id="penugasan-import-errors" class="import-error-panel"></div>
+          <div class="table-toolbar">
+            <input type="text" class="form-control" placeholder="🔍 Cari penugasan..." style="max-width:240px;" oninput="MasterPenugasan.onSearch(this.value)">
+            <select class="form-control" style="max-width:180px;" onchange="MasterPenugasan.onFilter('filterAktif', this.value)">
+              <option value="">Semua Status</option>
+              <option value="1">Aktif</option>
+              <option value="0">Selesai</option>
+            </select>
+            <div class="toolbar-spacer"></div>
+            <div class="toolbar-actions">
+              <button class="btn btn-secondary btn-sm" onclick="MasterImport.downloadTemplate('penugasan')">📋 Template</button>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;">
+                📤 Import <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="MasterImport.importFile('penugasan', this.files[0], 'penugasan-import-errors')">
+              </label>
+              <button class="btn btn-secondary btn-sm" onclick="MasterPenugasan.exportExcel()">📥 Export</button>
+              <button class="btn btn-primary btn-sm" onclick="MasterPenugasan.openAdd()">+ Tambah Penugasan</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Penyadap</th>
+                    <th>Petak</th>
+                    <th onclick="MasterPenugasan.onSort('persen_target')">Target</th>
+                    <th>Jumlah Pohon</th>
+                    <th>Keterangan</th>
+                    <th onclick="MasterPenugasan.onSort('aktif')">Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="penugasan-tbody"></tbody>
+              </table>
+            </div>
+            <div id="penugasan-pagination"></div>
+          </div>
+        </div>
+
+        <!-- ── User Panel ── -->
+        <div id="tab-user" class="master-panel" style="display:none;">
+          <div id="user-import-errors" class="import-error-panel"></div>
+          <div class="table-toolbar">
+            <input type="text" class="form-control" placeholder="🔍 Cari pengguna..." style="max-width:240px;" oninput="MasterUser.onSearch(this.value)">
+            <select class="form-control" style="max-width:180px;" onchange="MasterUser.onFilter('filterRole', this.value)">
+              <option value="">Semua Peran</option>
+              <option value="admin">Administrator</option>
+              <option value="bkph">Asper</option>
+              <option value="krph">KRPH</option>
+              <option value="tpg">Mandor TPG</option>
+              <option value="mandor">Mandor Sadap</option>
+            </select>
+            <select class="form-control" style="max-width:150px;" onchange="MasterUser.onFilter('filterStatus', this.value)">
+              <option value="">Semua Status</option>
+              <option value="aktif">Aktif</option>
+              <option value="nonaktif">Nonaktif</option>
+            </select>
+            <div class="toolbar-spacer"></div>
+            <div class="toolbar-actions">
+              <button class="btn btn-secondary btn-sm" onclick="MasterImport.downloadTemplate('user')">📋 Template</button>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;">
+                📤 Import <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="MasterImport.importFile('user', this.files[0], 'user-import-errors')">
+              </label>
+              <button class="btn btn-secondary btn-sm" onclick="MasterUser.exportExcel()">📥 Export</button>
+              <button class="btn btn-primary btn-sm" onclick="MasterUser.openAdd()">+ Tambah Pengguna</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th onclick="MasterUser.onSort('nama_lengkap')">Nama / NIP</th>
+                    <th onclick="MasterUser.onSort('username')">Username</th>
+                    <th onclick="MasterUser.onSort('role')">Jabatan / Peran</th>
+                    <th>Wilayah Kerja</th>
+                    <th onclick="MasterUser.onSort('status')">Status</th>
+                    <th onclick="MasterUser.onSort('created_at')">Dibuat</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="user-master-tbody"></tbody>
+              </table>
+            </div>
+            <div id="user-master-pagination"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── TARGET & RO ─── -->
+      <section id="target-ro-section" class="page-section">
+        <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h2 class="section-title">Target &amp; Rencana Operasional</h2>
+            <p class="section-subtitle">Kelola target tahunan dan rencana kesanggupan bulanan</p>
+          </div>
+        </div>
+
+        <!-- Target & RO Sub-Tabs Switcher -->
+        <div class="master-tabs" style="margin-bottom:1.5rem;">
+          <button id="btn-subtab-target" class="btn btn-primary btn-sm master-tab active" onclick="TargetModule.init()">🎯 Target Tahunan</button>
+          <button id="btn-subtab-ro" class="btn btn-secondary btn-sm master-tab" onclick="
+            document.getElementById('target-sub-section').style.display='none';
+            document.getElementById('ro-sub-section').style.display='block';
+            document.getElementById('btn-subtab-target').classList.remove('active');
+            document.getElementById('btn-subtab-target').classList.add('btn-secondary');
+            document.getElementById('btn-subtab-target').classList.remove('btn-primary');
+            this.classList.add('active');
+            this.classList.remove('btn-secondary');
+            this.classList.add('btn-primary');
+            (function() {
+              var r = window.app && window.app.currentUser ? window.app.currentUser.role : '';
+              var btn = document.getElementById('btn-add-ro');
+              if (btn) btn.style.display = (r==='admin'||r==='mandor'||r==='tpg') ? 'inline-flex' : 'none';
+            })();
+            app.loadTargetROData();
+          ">📋 Rencana Operasional (RO)</button>
+        </div>
+
+        <!-- ──────────────── Target Tahunan Sub-Section ──────────────── -->
+        <div id="target-sub-section" style="display:block;">
+          
+          <!-- Dropdown Filter Tahun -->
+          <div class="card" style="margin-bottom:1.5rem;padding:1rem;display:flex;align-items:center;gap:1rem;">
+            <label style="font-weight:600;font-size:.9rem;color:var(--text-secondary);">Tahun Produksi:</label>
+            <select class="form-control" style="max-width:150px;margin:0;" onchange="TargetModule.changeTahun(this.value)">
+              <option value="2026" selected>2026</option>
+              <option value="2027">2027</option>
+              <option value="2028">2028</option>
+              <option value="2029">2029</option>
+            </select>
+          </div>
+
+          <!-- Indikator Kelengkapan Target (🟢/🟡/🔴) -->
+          <div id="target-indicator-bar" class="metrics-grid" style="margin-bottom:1.5rem;">
+            <!-- Rendered by target.js -->
+          </div>
+
+          <div id="target-import-errors" class="import-error-panel"></div>
+
+          <!-- Tab Hirarki Target -->
+          <div id="target-tab-headers" class="master-tabs" style="margin-bottom:1.5rem;border-bottom:none;">
+            <!-- Rendered by target.js -->
+          </div>
+
+          <!-- Toolbar Tabel Target -->
+          <div class="table-toolbar">
+            <input type="text" id="target-search-input" class="form-control" placeholder="🔍 Cari..." style="max-width:240px;" oninput="TargetModule.onSearch(this.value)">
+            <div class="toolbar-spacer"></div>
+            <div class="toolbar-actions">
+              <button id="btn-template-target" class="btn btn-secondary btn-sm" onclick="MasterImport.downloadTemplate(TargetModule.subTab)">📋 Template</button>
+              <label id="btn-import-target" class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;">
+                📤 Import <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="MasterImport.importFile(TargetModule.subTab, this.files[0], 'target-import-errors');this.value=''">
+              </label>
+              <button class="btn btn-secondary btn-sm" onclick="TargetModule.exportExcel()">📥 Export</button>
+              <button id="btn-add-target" class="btn btn-primary btn-sm" onclick="TargetModule.openAdd()">+ Tambah Target</button>
+            </div>
+          </div>
+
+          <!-- Tabel Target -->
+          <div class="table-container">
+            <div class="table-wrapper">
+              <table style="width:100%">
+                <thead id="target-thead">
+                  <!-- Rendered dynamically by target.js -->
+                </thead>
+                <tbody id="target-tbody">
+                  <!-- Rendered dynamically by target.js -->
+                </tbody>
+              </table>
+            </div>
+            <div id="target-pagination"></div>
+          </div>
+        </div>
+
+        <!-- ──────────────── Rencana Operasional (RO) Sub-Section ──────────────── -->
+        <div id="ro-sub-section" style="display:none;">
+          <div class="table-toolbar" style="margin-bottom:1.5rem; justify-content: flex-end;">
+            <button id="btn-add-ro" class="btn btn-primary btn-sm" onclick="TargetModule.openAddRO()">+ Susun RO Baru</button>
+          </div>
+          <div class="table-container">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Periode Target</th>
+                    <th>Nama Penyadap</th>
+                    <th>Areal Sadap</th>
+                    <th>Kesanggupan</th>
+                    <th>Status RO</th>
+                    <th>Status Sinkron</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="ro-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── REALISASI ─── -->
+      <section id="realisasi-section" class="page-section">
+        <div class="section-header" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h2 class="section-title">Realisasi Timbangan Getah</h2>
+            <p class="section-subtitle">Catatan penyerahan getah pinus di TPG</p>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center;">
+            <button class="btn btn-secondary btn-sm" onclick="RealisasiModule.exportExcel()">📥 Export</button>
+            <button id="btn-input-realisasi" class="btn btn-primary btn-sm" onclick="RealisasiModule.openAdd()">+ Input Realisasi</button>
+          </div>
+        </div>
+
+        <!-- Ringkasan Statistik -->
+        <div class="metrics-grid" style="margin-bottom:1.5rem;">
+          <div class="card metric-card">
+            <div class="metric-header"><span class="metric-title">TOTAL TARGET RO</span><span class="metric-icon">🎯</span></div>
+            <div class="metric-value" id="real-total-ro" style="font-size:1.3rem;">0 kg</div>
+          </div>
+          <div class="card metric-card">
+            <div class="metric-header"><span class="metric-title">TOTAL REALISASI BERSIH</span><span class="metric-icon">🛢️</span></div>
+            <div class="metric-value" id="real-total-bersih" style="font-size:1.3rem;">0 kg</div>
+          </div>
+          <div class="card metric-card">
+            <div class="metric-header"><span class="metric-title">JUMLAH TRANSAKSI</span><span class="metric-icon">📋</span></div>
+            <div class="metric-value" id="real-total-trx" style="font-size:1.3rem;">0 transaksi</div>
+          </div>
+          <div class="card metric-card">
+            <div class="metric-header"><span class="metric-title">PENYADAP SETOR</span><span class="metric-icon">👷</span></div>
+            <div class="metric-value" id="real-total-pnd" style="font-size:1.3rem;">0 penyadap</div>
+          </div>
+        </div>
+
+        <!-- Filter Toolbar -->
+        <div class="table-toolbar" style="margin-bottom:1rem;">
+          <input type="text" class="form-control" placeholder="🔍 Cari penyadap / mutu..." style="max-width:240px;" oninput="RealisasiModule.onSearch(this.value)">
+          <input type="month" id="real-filter-bulan" class="form-control" style="max-width:180px;" value="2026-07" onchange="RealisasiModule.onFilter('filterBulan', this.value)" title="Filter Bulan">
+          <select class="form-control" style="max-width:160px;" onchange="RealisasiModule.onFilter('filterPeriode', this.value)" title="Filter Periode">
+            <option value="">Semua Periode</option>
+            <option value="1">Periode 1 (1–15)</option>
+            <option value="2">Periode 2 (16–31)</option>
+          </select>
+          <select class="form-control" style="max-width:180px;" onchange="RealisasiModule.onFilter('filterMutu', this.value)">
+            <option value="">Semua Mutu</option>
+            <option value="Mutu Premium">Mutu Premium</option>
+            <option value="Mutu Super Premium">Mutu Super Premium</option>
+            <option value="Mutu 1">Mutu 1</option>
+            <option value="Mutu 2">Mutu 2</option>
+          </select>
+        </div>
+
+
+        <!-- Tabel Realisasi -->
+        <div class="table-container"><div class="table-wrapper"><table>
+          <thead><tr>
+            <th onclick="RealisasiModule.onSort('tanggal')" style="cursor:pointer;">Tanggal Setor ↕</th>
+            <th>Penyadap</th>
+            <th>TPG</th>
+            <th>Target RO (kg)</th>
+            <th onclick="RealisasiModule.onSort('berat_bersih')" style="cursor:pointer;">Realisasi Bersih ↕</th>
+            <th>Pencapaian (%)</th>
+            <th>Mutu</th>
+            <th>Status Sinkron</th>
+            <th>Aksi</th>
+          </tr></thead>
+          <tbody id="realisasi-table-body"></tbody>
+        </table></div></div>
+        <div id="realisasi-pagination"></div>
+      </section>
+
+      <!-- ─── LAPORAN ─── -->
+      <section id="laporan-section" class="page-section">
+        <div class="section-header no-print">
+          <h2 class="section-title">Laporan Kerja &amp; Produksi</h2>
+          <p class="section-subtitle">Cetak laporan kerja harian, bulanan, atau rentang tanggal tertentu dengan Kop Resmi</p>
+        </div>
+
+        <!-- Filter Toolbar (Sembunyikan saat cetak) -->
+        <div class="card no-print" style="margin-bottom:1.5rem;">
+          <div class="form-grid-3" style="align-items:flex-end;gap:1rem;display:flex;flex-wrap:wrap;">
+            <div class="form-group" style="flex:1;min-width:200px;">
+              <label>Jenis Laporan</label>
+              <select id="rpt-jenis" class="form-control" onchange="LaporanModule.onChangeJenis()">
+                <option value="realisasi">🛢️ Laporan Realisasi Produksi</option>
+                <option value="kehadiran">👷 Laporan Kehadiran Penyadap</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1;min-width:200px;">
+              <label>Filter Waktu</label>
+              <select id="rpt-filter-tipe" class="form-control" onchange="LaporanModule.onChangeFilterTipe()">
+                <option value="periode">Per Periode Bulanan</option>
+                <option value="harian">Harian (Satu Hari)</option>
+                <option value="rentang">Rentang Tanggal Kustom</option>
+              </select>
+            </div>
+            
+            <!-- Dynamic Date/Period Inputs -->
+            <div id="rpt-input-periode" style="display:flex;gap:1rem;flex:2;min-width:280px;">
+              <div class="form-group" style="flex:1;">
+                <label>Bulan</label>
+                <select id="rpt-bulan" class="form-control">
+                  <option value="1">Januari</option>
+                  <option value="2">Februari</option>
+                  <option value="3">Maret</option>
+                  <option value="4">April</option>
+                  <option value="5">Mei</option>
+                  <option value="6">Juni</option>
+                  <option value="7" selected>Juli</option>
+                  <option value="8">Agustus</option>
+                  <option value="9">September</option>
+                  <option value="10">Oktober</option>
+                  <option value="11">November</option>
+                  <option value="12">Desember</option>
+                </select>
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label>Periode</label>
+                <select id="rpt-periode" class="form-control">
+                  <option value="1">Periode 1 (Tgl 1 - 15)</option>
+                  <option value="2">Periode 2 (Tgl 16 - Akhir Bulan)</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="rpt-input-harian" class="form-group" style="display:none;flex:1;min-width:200px;">
+              <label>Pilih Tanggal</label>
+              <input type="date" id="rpt-tanggal" class="form-control">
+            </div>
+
+            <div id="rpt-input-rentang" style="display:none;gap:1rem;flex:2;min-width:280px;">
+              <div class="form-group" style="flex:1;">
+                <label>Dari Tanggal</label>
+                <input type="date" id="rpt-tgl-awal" class="form-control">
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label>Sampai Tanggal</label>
+                <input type="date" id="rpt-tgl-akhir" class="form-control">
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.25rem;border-top:1px solid var(--border-color);padding-top:1rem;">
+            <button class="btn btn-secondary" onclick="LaporanModule.renderReport()">🔍 Tampilkan Preview</button>
+            <button class="btn btn-secondary" onclick="LaporanModule.exportExcel()">📥 Ekspor Excel</button>
+            <button class="btn btn-primary" onclick="LaporanModule.printReport()">🖨️ Cetak Laporan (PDF)</button>
+          </div>
+        </div>
+
+        <!-- Area Laporan (Ini yang dicetak) -->
+        <div class="card print-container" style="background:#fff;color:#000;padding:2.5rem;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+          <!-- Kop Surat Perhutani -->
+          <div class="kop-surat" style="display:flex;align-items:center;border-bottom:3px double #000;padding-bottom:1rem;margin-bottom:1.5rem;gap:1.5rem;">
+            <!-- Logo Perhutani -->
+            <div style="width:80px;height:70px;flex-shrink:0;display:flex;align-items:center;">
+              <img src="assets/logo.svg" alt="Logo Perhutani" style="width:100%;height:100%;object-fit:contain;">
+            </div>
+            <div style="flex-grow:1;text-align:left;">
+              <h3 style="margin:0;font-size:1.15rem;font-weight:700;letter-spacing:0.5px;color:#111;">PERUM PERHUTANI</h3>
+              <h4 style="margin:2px 0 0 0;font-size:1rem;font-weight:600;color:#222;">DIVISI REGIONAL JAWA TENGAH</h4>
+              <h5 style="margin:2px 0 0 0;font-size:.9rem;font-weight:500;color:#333;" id="kop-kph">KESATUAN PEMANGKUAN HUTAN (KPH) PEKALONGAN BARAT</h5>
+              <h5 style="margin:2px 0 0 0;font-size:.85rem;font-weight:500;color:#444;" id="kop-bkph">BAGIAN KESATUAN PEMANGKUAN HUTAN (BKPH) BANTARKAWUNG</h5>
+              <p style="margin:4px 0 0 0;font-size:.75rem;color:#666;font-style:italic;">Alamat: Jl. Raya Bantarkawung No.10, Brebes 52274</p>
+            </div>
+          </div>
+
+          <!-- Judul Laporan -->
+          <div style="text-align:center;margin-bottom:1.5rem;">
+            <h2 id="rpt-title" style="margin:0;font-size:1.25rem;font-weight:700;color:#111;text-transform:uppercase;">LAPORAN REALISASI PRODUKSI GETAH</h2>
+            <p id="rpt-subtitle" style="margin:4px 0 0 0;font-size:.85rem;color:#444;font-weight:500;">Periode: —</p>
+          </div>
+
+          <!-- Tabel Laporan -->
+          <div class="table-container" style="border:1px solid #ddd;border-radius:4px;overflow:hidden;">
+            <table class="report-table" style="width:100%;border-collapse:collapse;color:#111;font-size:.85rem;">
+              <thead id="rpt-table-head">
+                <!-- Will be dynamically generated -->
+              </thead>
+              <tbody id="rpt-table-body">
+                <tr><td style="padding:2rem;color:#666;text-align:center;">Klik "Tampilkan Preview" untuk memuat data laporan</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Tanda Tangan Mandor/Asper -->
+          <div style="margin-top:3rem;display:flex;justify-content:space-between;padding:0 2rem;font-size:.85rem;color:#111;">
+            <div style="text-align:center;">
+              <p style="margin-bottom:4.5rem;">Mengetahui,<br><strong>Asper / KBPH Bantarkawung</strong></p>
+              <p style="text-decoration:underline;font-weight:600;" id="rpt-sign-asper">Heri Wibowo</p>
+              <p style="font-size:.75rem;color:#555;" id="rpt-sign-asper-nip">NIP. 197608142002121001</p>
+            </div>
+            <div style="text-align:center;">
+              <p style="margin-bottom:4.5rem;" id="rpt-date-label">Bantarkawung, —<br><strong>Petugas Pembuat Laporan</strong></p>
+              <p style="text-decoration:underline;font-weight:600;" id="rpt-sign-maker">Budi Santoso</p>
+              <p style="font-size:.75rem;color:#555;" id="rpt-sign-maker-nip">NIP. 198104122005011002</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── PENGATURAN ─── -->
+      <section id="pengaturan-section" class="page-section">
+        <div class="section-header">
+          <h2 class="section-title">Pengaturan Aplikasi</h2>
+          <p class="section-subtitle">Konfigurasi lokal, simulasi koneksi, dan manajemen data</p>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:1rem;">
+          <div class="card">
+            <h3 style="margin-bottom:1rem;font-size:1.1rem;color:var(--primary);">Simulasi Offline / Online</h3>
+            <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:1.5rem;">Gunakan pengaturan di bawah ini untuk menguji performa aplikasi saat koneksi sinyal terganggu.</p>
+            <div style="display:flex;gap:.75rem;">
+              <button class="btn btn-secondary" onclick="Object.defineProperty(navigator,'onLine',{value:false,configurable:true});window.dispatchEvent(new Event('offline'));app.showToast('Mode offline disimulasikan','danger')">🔌 Putuskan Koneksi</button>
+              <button class="btn btn-primary" onclick="Object.defineProperty(navigator,'onLine',{value:true,configurable:true});window.dispatchEvent(new Event('online'));app.showToast('Koneksi internet terdeteksi','success')">📡 Hubungkan Kembali</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="margin-bottom:1rem;font-size:1.1rem;color:var(--danger);">Reset Data Lokal</h3>
+            <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:1rem;">Pilih mode reset sesuai kebutuhan:</p>
+
+            <!-- Status Mode Saat Ini -->
+            <div id="seed-mode-indicator" style="font-size:.8rem;padding:.5rem .75rem;border-radius:var(--radius-sm);margin-bottom:1.25rem;background:var(--bg-surface-elevated);border:1px solid var(--border-color);">
+              Mode aktif: <strong id="seed-mode-label">—</strong>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:.75rem;">
+              <!-- Reset Data Nyata — ADMIN ONLY -->
+              <div id="reset-data-nyata-card" style="display:none;border:1px solid var(--primary);border-radius:var(--radius-sm);padding:1rem;">
+                <div style="font-weight:600;color:var(--primary);margin-bottom:.35rem;">🚀 Reset untuk Data Nyata</div>
+                <div style="font-size:.8rem;color:var(--text-secondary);margin-bottom:.75rem;">Hapus semua data lokal tanpa mengisi data contoh. Gunakan ini sebelum import data sebenarnya.</div>
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                  <button class="btn btn-primary btn-sm" onclick="
+                    if(confirm('Reset database dan aktifkan mode Data Nyata? Semua data lokal akan dihapus dan data contoh TIDAK akan dimuat ulang.')) {
+                      localStorage.setItem('sipena_skip_seed','1');
+                      indexedDB.deleteDatabase('sipena_lite_db');
+                      location.reload();
+                    }
+                  ">🚀 Reset Total Data Nyata</button>
+                  
+                  <button class="btn btn-warning btn-sm" onclick="
+                    if(confirm('Bersihkan hanya data transaksi simulasi (RO, Realisasi, Kehadiran, Monitoring, Target)? Master Data Petak & User yang sudah di-upload akan tetap aman.')) {
+                      (async () => {
+                        try {
+                          localStorage.setItem('sipena_skip_seed','1');
+                          await window.db.clearStore('ro');
+                          await window.db.clearStore('realisasi');
+                          await window.db.clearStore('kehadiran');
+                          await window.db.clearStore('monitoring');
+                          await window.db.clearStore('target_bkph');
+                          await window.db.clearStore('target_rph');
+                          await window.db.clearStore('target_tpg');
+                          await window.db.clearStore('target_mandor');
+                          await window.db.clearStore('target_penyadap');
+                          alert('Data transaksi simulasi berhasil dibersihkan! Halaman akan dimuat ulang.');
+                          location.reload();
+                        } catch(err) {
+                          alert('Gagal membersihkan data: ' + err.message);
+                        }
+                      })();
+                    }
+                  ">🧹 Bersihkan Transaksi Contoh</button>
+                </div>
+              </div>
+
+              <!-- Reset ke Data Contoh — SEMUA USER -->
+              <div style="border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:1rem;">
+                <div style="font-weight:600;color:var(--text-secondary);margin-bottom:.35rem;">🔄 Reset ke Data Contoh</div>
+                <div style="font-size:.8rem;color:var(--text-secondary);margin-bottom:.75rem;">Hapus semua data lokal dan muat ulang data contoh bawaan aplikasi (seed).</div>
+                <button class="btn btn-danger btn-sm" onclick="
+                  if(confirm('Reset ke data contoh? Semua data yang sudah diinput akan hilang.')) {
+                    localStorage.removeItem('sipena_skip_seed');
+                    indexedDB.deleteDatabase('sipena_lite_db');
+                    localStorage.clear();
+                    location.reload();
+                  }
+                ">⚠️ Reset ke Data Contoh</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <script>
+          (function() {
+            // Tampilkan status mode
+            const skip = localStorage.getItem('sipena_skip_seed') === '1';
+            const lbl = document.getElementById('seed-mode-label');
+            if (lbl) {
+              lbl.textContent = skip ? 'Data Nyata 🚀' : 'Data Contoh (Seed)';
+              lbl.style.color = skip ? 'var(--primary)' : 'var(--text-secondary)';
+            }
+
+            // Tampilkan tombol Reset Data Nyata hanya untuk admin
+            function applyResetVisibility() {
+              const role = window.app && window.app.currentUser ? window.app.currentUser.role : '';
+              const card = document.getElementById('reset-data-nyata-card');
+              if (card) card.style.display = role === 'admin' ? 'block' : 'none';
+            }
+
+            // Coba segera, atau tunggu app siap
+            if (window.app && window.app.currentUser) {
+              applyResetVisibility();
+            } else {
+              window.addEventListener('sipena:ready', applyResetVisibility);
+              setTimeout(applyResetVisibility, 1000); // fallback
+            }
+          })();
+        </script>
+      </section>
+
+
+
+    </div><!-- end content-body -->
+  </main>
+</div><!-- end app-container -->
+
+<!-- ══════════════ MODALS ══════════════ -->
+
+<!-- BKPH Modal -->
+<div id="bkph-modal" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="bkph-modal-title" class="modal-title">Tambah BKPH</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('bkph-modal')">&times;</button>
+    </div>
+    <form id="bkph-form" onsubmit="MasterBKPH.save(event)">
+      <input type="hidden" id="bkph-id">
+      <div class="form-group"><label>Kode BKPH *</label><input id="bkph-kode" class="form-control" required placeholder="Contoh: BKPH-BTK"></div>
+      <div class="form-group"><label>Nama BKPH *</label><input id="bkph-nama" class="form-control" required placeholder="Nama BKPH"></div>
+      <div class="form-group"><label>Alamat</label><textarea id="bkph-alamat" class="form-control" placeholder="Alamat kantor BKPH"></textarea></div>
+      <div class="form-grid-2">
+        <div class="form-group"><label>Telepon</label><input id="bkph-telepon" class="form-control" placeholder="Nomor telepon kantor"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="bkph-email" class="form-control" placeholder="Email kantor"></div>
+      </div>
+      <div class="form-group"><label>Keterangan</label><textarea id="bkph-keterangan" class="form-control" placeholder="Keterangan tambahan"></textarea></div>
+      <div class="form-group"><label>Status</label>
+        <select id="bkph-status" class="form-control">
+          <option value="Aktif">Aktif</option>
+          <option value="Tidak Aktif">Tidak Aktif</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('bkph-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- RPH Modal -->
+<div id="rph-modal" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="rph-modal-title" class="modal-title">Tambah RPH</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('rph-modal')">&times;</button>
+    </div>
+    <form id="rph-form" onsubmit="MasterRPH.save(event)">
+      <input type="hidden" id="rph-id">
+      <div class="form-group"><label>BKPH</label><select id="rph-bkph" class="form-control" required></select></div>
+      <div class="form-group"><label>Kode RPH</label><input id="rph-kode" class="form-control" required placeholder="Contoh: RPH-BTK"></div>
+      <div class="form-group"><label>Nama RPH</label><input id="rph-nama" class="form-control" required placeholder="Nama RPH"></div>
+      <div class="form-group"><label>Keterangan</label><textarea id="rph-keterangan" class="form-control" placeholder="Keterangan tambahan"></textarea></div>
+      <div class="form-group"><label>Status</label>
+        <select id="rph-status" class="form-control">
+          <option value="aktif">Aktif</option>
+          <option value="nonaktif">Nonaktif</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('rph-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- TPG Modal -->
+<div id="tpg-modal" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="tpg-modal-title" class="modal-title">Tambah TPG</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('tpg-modal')">&times;</button>
+    </div>
+    <form id="tpg-form" onsubmit="MasterTPG.save(event)">
+      <input type="hidden" id="tpg-id">
+      <div class="form-group"><label>RPH</label><select id="tpg-rph" class="form-control" required></select></div>
+      <div class="form-group"><label>Kode TPG</label><input id="tpg-kode" class="form-control" required placeholder="Contoh: TPG-CSR"></div>
+      <div class="form-group"><label>Nama TPG</label><input id="tpg-nama" class="form-control" required placeholder="Nama TPG"></div>
+      <div class="form-group"><label>Keterangan</label><textarea id="tpg-keterangan" class="form-control" placeholder="Keterangan tambahan"></textarea></div>
+      <div class="form-group"><label>Status</label>
+        <select id="tpg-status" class="form-control">
+          <option value="aktif">Aktif</option>
+          <option value="nonaktif">Nonaktif</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('tpg-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Petak Modal -->
+<div id="petak-modal" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="petak-modal-title" class="modal-title">Tambah Petak</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('petak-modal')">&times;</button>
+    </div>
+    <form id="petak-form" onsubmit="MasterPetak.save(event)">
+      <input type="hidden" id="petak-id">
+      <div class="form-group"><label>RPH</label><select id="petak-rph" class="form-control" required></select></div>
+      <div class="form-group"><label>TPG (Tempat Penimbangan Getah)</label><select id="petak-tpg" class="form-control" required></select></div>
+      <div class="form-group"><label>Nomor Petak</label><input id="petak-nomor" class="form-control" required placeholder="Contoh: 42"></div>
+      <div class="form-grid-2">
+        <div class="form-group"><label>Luas (Ha)</label><input type="number" step="0.01" id="petak-luas" class="form-control" required placeholder="0.00"></div>
+        <div class="form-group"><label>Jumlah Pohon</label><input type="number" id="petak-pohon" class="form-control" required placeholder="0"></div>
+      </div>
+      <div class="form-group"><label>Tahun Tanam</label><input id="petak-kelas" class="form-control" type="number" placeholder="Contoh: 2018"></div>
+      <div class="form-group"><label>Keterangan</label><textarea id="petak-keterangan" class="form-control" placeholder="Keterangan opsional"></textarea></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('petak-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Anak Petak Modal -->
+<div id="ap-modal" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="ap-modal-title" class="modal-title">Tambah Anak Petak</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('ap-modal')">&times;</button>
+    </div>
+    <form id="ap-form" onsubmit="MasterAnakPetak.save(event)">
+      <input type="hidden" id="ap-id">
+      <div class="form-group"><label>Petak Induk</label><select id="ap-petak" class="form-control" required></select></div>
+      <div class="form-group"><label>Huruf Anak Petak</label><input id="ap-huruf" class="form-control" required placeholder="Contoh: A, B, C1"></div>
+      <div class="form-grid-2">
+        <div class="form-group"><label>Luas (Ha)</label><input type="number" step="0.01" id="ap-luas" class="form-control" required placeholder="0.00"></div>
+        <div class="form-group"><label>Jumlah Pohon</label><input type="number" id="ap-pohon" class="form-control" required placeholder="0"></div>
+      </div>
+      <div class="form-group"><label>Keterangan</label><textarea id="ap-keterangan" class="form-control" placeholder="Opsional"></textarea></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('ap-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Penyadap Modal -->
+<div id="penyadap-modal" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="penyadap-modal-title" class="modal-title">Tambah Penyadap</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('penyadap-modal')">&times;</button>
+    </div>
+    <form id="penyadap-form" onsubmit="MasterPenyadap.save(event)">
+      <input type="hidden" id="penyadap-id">
+      <div class="form-group"><label>Nomor Penyadap</label><input id="penyadap-nomor" class="form-control" required placeholder="Contoh: PS-001"></div>
+      <div class="form-group"><label>Nama Lengkap</label><input id="penyadap-nama" class="form-control" required placeholder="Nama penyadap"></div>
+      <div class="form-group"><label>Alamat</label><textarea id="penyadap-alamat" class="form-control" placeholder="Alamat lengkap"></textarea></div>
+      <div class="form-group"><label>No. HP</label><input id="penyadap-hp" class="form-control" placeholder="08xxxxxxxxxx"></div>
+      <div class="form-group"><label>Status</label>
+        <select id="penyadap-status" class="form-control">
+          <option value="aktif">Aktif</option>
+          <option value="tidak_aktif">Tidak Aktif</option>
+          <option value="pindah">Pindah</option>
+          <option value="berhenti">Berhenti</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('penyadap-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Penugasan Modal -->
+<div id="penugasan-modal" class="modal-backdrop">
+  <div class="modal-content" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 id="penugasan-modal-title" class="modal-title">Tambah Penugasan Areal</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('penugasan-modal')">&times;</button>
+    </div>
+    <form id="penugasan-form" onsubmit="MasterPenugasan.save(event)">
+      <input type="hidden" id="penugasan-id">
+      <div class="form-group"><label>Penyadap</label><select id="pgn-penyadap" class="form-control" required></select></div>
+      <div class="form-group"><label>Petak</label><select id="pgn-anak-petak" class="form-control" required></select></div>
+      <div class="form-group"><label>Target</label>
+        <input type="number" id="pgn-persen" class="form-control" required min="1" max="100" value="100" placeholder="100">
+        <span class="form-hint">Jika satu petak dikerjakan dua penyadap, masing-masing bisa 50%</span>
+      </div>
+      <div class="form-group"><label>Jumlah Pohon</label>
+        <input type="number" id="pgn-pohon" class="form-control" required placeholder="Contoh: 500">
+      </div>
+      <div class="form-group"><label>Status Penugasan</label>
+        <select id="pgn-aktif" class="form-control">
+          <option value="1">Aktif</option>
+          <option value="0">Selesai</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Keterangan</label><textarea id="pgn-keterangan" class="form-control" placeholder="Opsional"></textarea></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('penugasan-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Target Modal -->
+<div id="target-modal" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="target-modal-title" class="modal-title">Tambah Target</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('target-modal')">&times;</button>
+    </div>
+    <form id="target-modal-form" onsubmit="TargetModule.save(event)">
+      <input type="hidden" id="target-item-id">
+      
+      <!-- Tahun input -->
+      <div class="form-group">
+        <label>Tahun Produksi</label>
+        <input type="number" id="target-tahun" class="form-control" required readonly>
+      </div>
+
+      <!-- General targets (BKPH, RPH, TPG, Mandor) -->
+      <div id="target-general-group">
+        <div class="form-group">
+          <label id="target-entity-label">Pilih Entitas</label>
+          <select id="target-entity-select" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label>Target Produksi (Kg)</label>
+          <input type="number" id="target-val-kg" class="form-control" placeholder="Target tahunan dalam Kilogram" min="1">
+        </div>
+      </div>
+
+      <!-- Target Penyadap (Penyadap + Anak Petak + Luas + Target Kg) -->
+      <div id="target-penyadap-group" style="display:none;">
+        <div class="form-group">
+          <label>Penyadap</label>
+          <select id="target-pnd-select" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label>Petak</label>
+          <select id="target-ap-select" class="form-control" onchange="TargetModule.onAnakPetakChange(this.value)"></select>
+        </div>
+        <div class="form-grid-3">
+          <div class="form-group">
+            <label>Luas Areal (Ha)</label>
+            <input type="number" step="0.01" id="target-luas-ha" class="form-control" placeholder="Luas (Ha)" min="0.01">
+          </div>
+          <div class="form-group">
+            <label>Jumlah Pohon</label>
+            <input type="number" id="target-pohon" class="form-control" placeholder="Pohon sadap" min="1">
+          </div>
+          <div class="form-group">
+            <label>Target Produksi (Kg)</label>
+            <input type="number" id="target-pnd-val-kg" class="form-control" placeholder="Target (Kg)" min="1">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('target-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- User Master Modal -->
+<div id="user-master-modal" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="user-master-modal-title" class="modal-title">Tambah Pengguna</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('user-master-modal')">&times;</button>
+    </div>
+    <form id="user-master-form" onsubmit="MasterUser.save(event)">
+      <input type="hidden" id="user-master-id">
+      <div class="form-group"><label>Nama Lengkap</label><input type="text" id="user-master-nama" class="form-control" required placeholder="Nama lengkap petugas"></div>
+      <div class="form-group"><label>NIP (Opsional)</label><input type="text" id="user-master-nip" class="form-control" placeholder="NIP petugas"></div>
+      <div class="form-group"><label>Username</label><input type="text" id="user-master-username" class="form-control" required placeholder="Username untuk login"></div>
+      <div id="user-password-group" class="form-group">
+        <label>Password</label>
+        <input type="password" id="user-master-password" class="form-control" placeholder="Password akun">
+        <span class="form-hint">Biarkan kosong jika tidak ingin mengubah password (mode edit)</span>
+      </div>
+      <div class="form-group"><label>Peran / Jabatan</label>
+        <select id="user-role-select" class="form-control" required onchange="MasterUser.onRoleChange()">
+          <option value="admin">Administrator</option>
+          <option value="bkph">Asper / Kepala BKPH</option>
+          <option value="krph">KRPH</option>
+          <option value="tpg">Mandor TPG</option>
+          <option value="mandor">Mandor Sadap</option>
+        </select>
+      </div>
+      <div id="user-rph-group" class="form-group" style="display:none;">
+        <label>RPH (Filter Wilayah)</label>
+        <select id="user-rph-select" class="form-control" onchange="MasterUser.onRphChange()"></select>
+      </div>
+      <div id="user-scope-group" class="form-group" style="display:none;">
+        <label id="user-scope-label">Wilayah Penugasan</label>
+        <select id="user-scope-select" class="form-control"></select>
+      </div>
+      <div class="form-group"><label>Status Akun</label>
+        <select id="user-master-status" class="form-control" required>
+          <option value="aktif">Aktif</option>
+          <option value="nonaktif">Nonaktif</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('user-master-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- RO Modal -->
+<div id="ro-modal" class="modal-backdrop">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="ro-modal-title" class="modal-title">Susun RO Baru</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('ro-modal')">&times;</button>
+    </div>
+    <form id="ro-modal-form" onsubmit="TargetModule.saveRO(event)">
+      <input type="hidden" id="ro-id">
+      
+      <div class="form-group">
+        <label>Tahun Produksi</label>
+        <select id="ro-tahun" class="form-control" required>
+          <option value="2026" selected>2026</option>
+          <option value="2027">2027</option>
+          <option value="2028">2028</option>
+          <option value="2029">2029</option>
+        </select>
+      </div>
+
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label>Bulan</label>
+          <select id="ro-bulan" class="form-control" required>
+            <option value="1">Januari</option>
+            <option value="2">Februari</option>
+            <option value="3">Maret</option>
+            <option value="4">April</option>
+            <option value="5">Mei</option>
+            <option value="6">Juni</option>
+            <option value="7" selected>Juli</option>
+            <option value="8">Agustus</option>
+            <option value="9">September</option>
+            <option value="10">Oktober</option>
+            <option value="11">November</option>
+            <option value="12">Desember</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Periode</label>
+          <select id="ro-periode" class="form-control" required>
+            <option value="1" selected>Periode 1 (Tgl 1-15)</option>
+            <option value="2">Periode 2 (Tgl 16-Akhir)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Penyadap</label>
+        <select id="ro-penyadap" class="form-control" required onchange="TargetModule.onROPenyadapChange(this.value)">
+          <option value="">— Pilih Penyadap —</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Areal / Anak Petak</label>
+        <select id="ro-areal" class="form-control" required>
+          <option value="">— Pilih Anak Petak —</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Kesanggupan Produksi (Kg)</label>
+        <input type="number" id="ro-kesanggupan" class="form-control" required min="1" placeholder="Kesanggupan target dalam Kg">
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('ro-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan RO</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Attendance Modal -->
+<div id="attendance-modal" class="modal-backdrop">
+  <div class="modal-content" style="max-width:550px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Pencatatan Kehadiran Penyadap</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('attendance-modal')">&times;</button>
+    </div>
+    <form id="attendance-form" onsubmit="DashboardModule.saveAttendance(event)">
+      <div class="form-group">
+        <label>Tanggal Absensi</label>
+        <input type="date" id="attendance-date" class="form-control" required readonly style="background:var(--bg-surface-elevated);color:var(--text-primary);">
+      </div>
+      <div style="max-height:300px;overflow-y:auto;margin-bottom:1.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-surface-elevated);">
+        <table style="width:100%;font-size:.875rem;border-collapse:collapse;">
+          <thead>
+            <tr style="background:var(--bg-surface);border-bottom:1px solid var(--border-color);color:var(--text-secondary);">
+              <th style="padding:.75rem .5rem;text-align:left;">Penyadap</th>
+              <th style="padding:.75rem .5rem;text-align:center;width:200px;">Status Kehadiran</th>
+            </tr>
+          </thead>
+          <tbody id="attendance-list-tbody">
+            <!-- Rendered dynamically by dashboard.js -->
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('attendance-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Kehadiran</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Realisasi Modal -->
+<div id="realisasi-modal" class="modal-backdrop">
+  <div class="modal-content" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 id="real-modal-title" class="modal-title">Input Realisasi Timbangan Getah</h3>
+      <button class="modal-close" onclick="SipenaUtils.closeModal('realisasi-modal')">&times;</button>
+    </div>
+    <form id="real-modal-form" onsubmit="RealisasiModule.save(event)">
+      <input type="hidden" id="real-id">
+
+      <div class="form-group">
+        <label>Penyadap</label>
+        <select id="real-penyadap" class="form-control" required onchange="RealisasiModule.updateROHelper()">
+          <option value="">- Pilih Penyadap -</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Tanggal Setor</label>
+        <input type="date" id="real-tanggal" class="form-control" required onchange="RealisasiModule.updateROHelper()">
+      </div>
+
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label>Target RO Periode Ini</label>
+          <input type="text" id="real-ro-helper" class="form-control" readonly style="background:var(--bg-surface-elevated); font-weight:bold; color:var(--primary);" value="0 kg">
+        </div>
+        <div class="form-group">
+          <label>Berat Realisasi / Bersih (kg)</label>
+          <input type="number" id="real-berat-bersih" class="form-control" required min="0" step="0.1"
+            placeholder="Contoh: 250">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Penentuan Mutu</label>
+        <select id="real-mutu" class="form-control" required>
+          <option value="">- Pilih Mutu -</option>
+          <option value="Mutu Super Premium">Mutu Super Premium</option>
+          <option value="Mutu Premium">Mutu Premium</option>
+          <option value="Mutu 1">Mutu 1</option>
+          <option value="Mutu 2">Mutu 2</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Keterangan (opsional)</label>
+        <textarea id="real-keterangan" class="form-control" rows="2" placeholder="Catatan tambahan..."></textarea>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="SipenaUtils.closeModal('realisasi-modal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Realisasi</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- Scripts -->
+<script src="js/db.js?v=5"></script>
+<script src="js/modules/utils.js?v=6"></script>
+<script src="js/modules/master-bkph.js?v=5"></script>
+<script src="js/modules/master-rph.js?v=5"></script>
+<script src="js/modules/master-tpg.js?v=5"></script>
+<script src="js/modules/master-petak.js?v=8"></script>
+<script src="js/modules/master-penyadap.js?v=5"></script>
+<script src="js/modules/master-penugasan.js?v=5"></script>
+<script src="js/modules/master-anak-petak.js?v=5"></script>
+<script src="js/modules/master-user.js?v=7"></script>
+<script src="js/modules/master-import.js?v=6"></script>
+<script src="js/modules/target.js?v=5"></script>
+<script src="js/modules/realisasi.js?v=1"></script>
+<script src="js/modules/dashboard.js?v=11"></script>
+<script src="js/modules/master.js?v=5"></script>
+<script src="js/modules/laporan.js?v=2"></script>
+<script src="js/app.js?v=5"></script>
+</body>
+</html>
