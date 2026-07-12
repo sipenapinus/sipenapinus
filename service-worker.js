@@ -1,10 +1,11 @@
-const CACHE_NAME = 'sipena-lite-v17';
+const CACHE_NAME = 'sipena-lite-v24';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './assets/logo.svg',
   './css/styles.css',
+  './js/seed-data.js',
   './js/app.js',
   './js/db.js',
   './js/modules/utils.js',

@@ -65,6 +65,7 @@
           <li><a class="nav-link" data-section="target-ro"><span class="nav-icon">📋</span> Target &amp; RO</a></li>
           <li><a class="nav-link" data-section="realisasi"><span class="nav-icon">🛢️</span> Realisasi Produksi</a></li>
           <li><a class="nav-link" data-section="laporan"><span class="nav-icon">📄</span> Laporan</a></li>
+          <li><a class="nav-link" data-section="panduan"><span class="nav-icon">📖</span> Panduan &amp; Tentang</a></li>
           <li><a class="nav-link" data-section="pengaturan"><span class="nav-icon">⚙️</span> Pengaturan</a></li>
         </ul>
       </nav>
@@ -1091,7 +1092,271 @@
           </script>
         </section>
 
+        <!-- ─── PANDUAN & TENTANG ─── -->
+        <section id="panduan-section" class="page-section">
+          <style>
+            .panduan-tabs-nav {
+              display: flex;
+              gap: 0.5rem;
+              margin-bottom: 1.5rem;
+              border-bottom: 1px solid var(--border-color);
+              padding-bottom: 0.5rem;
+            }
+            .panduan-tab-btn {
+              background: none;
+              border: none;
+              color: var(--text-secondary);
+              padding: 0.5rem 1rem;
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 0.95rem;
+              border-radius: var(--radius-sm);
+              transition: all 0.2s ease;
+            }
+            .panduan-tab-btn.active {
+              background: var(--bg-surface-elevated);
+              color: var(--primary);
+              border-bottom: 2px solid var(--primary);
+            }
+            .panduan-tab-btn:hover {
+              color: var(--primary);
+            }
+            .panduan-content {
+              display: none;
+            }
+            .panduan-content.active {
+              display: block;
+            }
+            .panduan-accordion {
+              display: flex;
+              flex-direction: column;
+              gap: 0.75rem;
+            }
+            .panduan-item {
+              border: 1px solid var(--border-color);
+              border-radius: var(--radius-sm);
+              background: var(--bg-surface-elevated);
+              overflow: hidden;
+              transition: all 0.3s ease;
+            }
+            .panduan-header {
+              padding: 1rem 1.25rem;
+              background: var(--bg-surface);
+              cursor: pointer;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-weight: 600;
+              user-select: none;
+              transition: background 0.2s ease;
+            }
+            .panduan-header:hover {
+              background: var(--bg-surface-elevated);
+            }
+            .panduan-header::after {
+              content: '▼';
+              font-size: 0.8rem;
+              color: var(--text-secondary);
+              transition: transform 0.2s ease;
+            }
+            .panduan-item.open .panduan-header::after {
+              transform: rotate(180deg);
+              color: var(--primary);
+            }
+            .panduan-body {
+              max-height: 0;
+              padding: 0 1.25rem;
+              overflow: hidden;
+              transition: all 0.3s cubic-bezier(0, 1, 0, 1);
+              color: var(--text-secondary);
+              font-size: 0.9rem;
+              line-height: 1.6;
+            }
+            .panduan-item.open .panduan-body {
+              max-height: 1000px;
+              padding: 1rem 1.25rem;
+              border-top: 1px solid var(--border-color);
+              transition: all 0.3s ease-in-out;
+            }
+            .panduan-step-list {
+              padding-left: 1.25rem;
+              margin: 0.5rem 0;
+            }
+            .panduan-step-list li {
+              margin-bottom: 0.5rem;
+            }
+            .about-logo-wrapper {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              text-align: center;
+              padding: 2rem 1rem;
+            }
+            .about-logo {
+              width: 100px;
+              height: 100px;
+              margin-bottom: 1rem;
+            }
+            .about-title {
+              font-size: 1.6rem;
+              font-weight: 700;
+              color: var(--primary);
+              margin-bottom: 0.25rem;
+            }
+            .about-tagline {
+              font-size: 0.9rem;
+              color: var(--text-secondary);
+              margin-bottom: 1.5rem;
+            }
+            .about-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+              gap: 1.5rem;
+              margin-top: 1.5rem;
+            }
+            .about-card {
+              border: 1px solid var(--border-color);
+              border-radius: var(--radius-sm);
+              background: var(--bg-surface-elevated);
+              padding: 1.25rem;
+            }
+            .about-card h4 {
+              margin-bottom: 0.75rem;
+              color: var(--primary);
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+            }
+          </style>
+          <div class="section-header">
+            <h2 class="section-title">Panduan &amp; Tentang</h2>
+            <p class="section-subtitle">Pusat dokumentasi penggunaan dan informasi sistem SIPENA Pinus</p>
+          </div>
 
+          <div class="panduan-tabs-nav">
+            <button class="panduan-tab-btn active" id="btn-panduan-guide" onclick="app.switchPanduanTab('guide')">📖 Panduan Penggunaan</button>
+            <button class="panduan-tab-btn" id="btn-panduan-about" onclick="app.switchPanduanTab('about')">ℹ️ Tentang Aplikasi</button>
+          </div>
+
+          <!-- TAB CONTENT: PANDUAN PENGGUNAAN -->
+          <div id="panduan-tab-guide" class="panduan-content active">
+            <div class="card">
+              <h3 style="margin-bottom: 1rem; color: var(--primary);">📖 Panduan Penggunaan Berdasarkan Peran</h3>
+              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Silakan pilih peran kerja Anda di bawah ini untuk melihat panduan langkah demi langkah cara mengoperasikan sistem SIPENA Pinus.
+              </p>
+
+              <div class="panduan-accordion">
+                <!-- Admin Accordion -->
+                <div class="panduan-item" id="accordion-admin">
+                  <div class="panduan-header" onclick="app.togglePanduanAccordion('accordion-admin')">
+                    🛡️ Peran: Administrator (Admin)
+                  </div>
+                  <div class="panduan-body">
+                    <p>Sebagai Administrator, Anda bertanggung jawab penuh atas konfigurasi awal wilayah kerja, pengelolaan pengguna, dan pemeliharaan database lokal.</p>
+                    <ol class="panduan-step-list">
+                      <li><strong>Konfigurasi Awal:</strong> Masuk ke <strong>Data Master</strong> dan input berturut-turut BKPH, RPH, dan TPG.</li>
+                      <li><strong>Kelola Pengguna:</strong> Masuk ke <strong>Data Master -> Pengguna</strong> untuk mendaftarkan akun baru bagi petugas lapangan (Asper, KRPH, Mandor).</li>
+                      <li><strong>Input Massal:</strong> Gunakan menu <strong>Import Excel</strong> di tab masing-masing jika ingin memasukkan data dalam jumlah besar. Download template resmi terlebih dahulu.</li>
+                      <li><strong>Backup Berkala:</strong> Lakukan backup data secara periodik lewat menu <strong>Pengaturan -> Cadangkan Database</strong> untuk mengantisipasi kerusakan data.</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <!-- BKPH Accordion -->
+                <div class="panduan-item" id="accordion-bkph">
+                  <div class="panduan-header" onclick="app.togglePanduanAccordion('accordion-bkph')">
+                    🏢 Peran: Asper / Kepala BKPH (KBPH)
+                  </div>
+                  <div class="panduan-body">
+                    <p>Sebagai Kepala BKPH, Anda dapat memantau produktivitas seluruh hutan di bawah BKPH Anda untuk mengambil keputusan strategis.</p>
+                    <ol class="panduan-step-list">
+                      <li><strong>Pantau Dashboard:</strong> Buka menu <strong>Dashboard</strong> untuk memantau status persentase target produksi (Warna Hijau = Aman, Kuning = Perhatian, Merah = Kritis).</li>
+                      <li><strong>Grafik &amp; Analisis:</strong> Analisis pencapaian getah bulanan dan perbandingan antar RPH.</li>
+                      <li><strong>Cetak Laporan:</strong> Masuk ke menu <strong>Laporan</strong> untuk mengunduh laporan bulanan format Excel guna keperluan dinas.</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <!-- KRPH Accordion -->
+                <div class="panduan-item" id="accordion-krph">
+                  <div class="panduan-header" onclick="app.togglePanduanAccordion('accordion-krph')">
+                    🌲 Peran: Kepala Resor Polisi Hutan (KRPH)
+                  </div>
+                  <div class="panduan-body">
+                    <p>Sebagai KRPH, Anda memantau realisasi per TPG di resor Anda serta memverifikasi kesanggupan kerja penyadap.</p>
+                    <ol class="panduan-step-list">
+                      <li><strong>Verifikasi Target:</strong> Buka menu <strong>Target &amp; RO</strong> untuk menyetujui Rencana Operasional (RO) yang dibuat oleh Mandor TPG.</li>
+                      <li><strong>Monitoring RPH:</strong> Masuk ke dashboard dan lakukan <i>drill-down</i> (klik nama RPH Anda) untuk melihat TPG dan petak mana yang produksinya tertinggal.</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <!-- TPG Accordion -->
+                <div class="panduan-item" id="accordion-tpg">
+                  <div class="panduan-header" onclick="app.togglePanduanAccordion('accordion-tpg')">
+                    ⚖️ Peran: Mandor Timbang (TPG)
+                  </div>
+                  <div class="panduan-body">
+                    <p>Sebagai Mandor TPG, Anda mencatat setoran getah harian dari penyadap dan menyusun Rencana Operasional (RO).</p>
+                    <ol class="panduan-step-list">
+                      <li><strong>Input Realisasi:</strong> Masuk ke <strong>Realisasi Produksi</strong>, klik <strong>+ Tambah Realisasi</strong>. Masukkan Nama Penyadap, Tanggal Setor, Berat Bersih (kg), dan Mutu Getah.</li>
+                      <li><strong>Susun Rencana Operasional (RO):</strong> Masuk ke <strong>Target &amp; RO -> Rencana Operasional</strong>. Klik <strong>+ Susun RO Baru</strong> di awal periode untuk menetapkan target kesanggupan penyadap.</li>
+                      <li><strong>Export Timbangan:</strong> Unduh data timbangan per periode ke format Excel untuk verifikasi ke dinas.</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <!-- Mandor Accordion -->
+                <div class="panduan-item" id="accordion-mandor">
+                  <div class="panduan-header" onclick="app.togglePanduanAccordion('accordion-mandor')">
+                    📋 Peran: Mandor Sadap (Lapangan)
+                  </div>
+                  <div class="panduan-body">
+                    <p>Sebagai Mandor Sadap, Anda mengontrol aktivitas penyadap di hutan pinus setiap hari secara offline.</p>
+                    <ol class="panduan-step-list">
+                      <li><strong>Presensi Harian:</strong> Di halaman <strong>Dashboard</strong> bagian bawah, pilih tanggal hari ini, klik <strong>Absen Hari Ini</strong> untuk mencatat kehadiran penyadap.</li>
+                      <li><strong>Monitoring Lapangan:</strong> Klik tombol <strong>Monitoring Lapangan</strong> pada dashboard untuk mencatat kondisi koakan getah pinus atau kendala cuaca (misalnya hujan lebat).</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB CONTENT: TENTANG APLIKASI -->
+          <div id="panduan-tab-about" class="panduan-content">
+            <div class="card">
+              <div class="about-logo-wrapper">
+                <img class="about-logo" src="assets/logo.svg" alt="SIPENA Logo">
+                <div class="about-title">SIPENA Pinus</div>
+                <div class="about-tagline">Sistem Informasi Pengelolaan Penyadapan Pinus &bull; v1.0.0</div>
+                <p style="max-width: 600px; font-size: 0.95rem; line-height: 1.6; color: var(--text-secondary);">
+                  SIPENA Pinus Lite adalah aplikasi berbasis web dengan arsitektur <strong>Offline-First</strong> yang dirancang khusus untuk membantu Perum Perhutani dalam mengelola data master, menyusun rencana operasional, memantau absensi, serta mencatat timbangan getah pinus secara mandiri tanpa ketergantungan jaringan internet.
+                </p>
+              </div>
+
+              <div class="about-grid">
+                <div class="about-card">
+                  <h4>⚡ Teknologi Offline-First</h4>
+                  <p style="font-size: 0.85rem; line-height: 1.5;"> Menggunakan Service Worker untuk cache file statis secara PWA dan IndexedDB untuk penyimpanan database lokal yang cepat di browser.</p>
+                </div>
+                <div class="about-card">
+                  <h4>🔒 Keamanan &amp; Hak Akses</h4>
+                  <p style="font-size: 0.85rem; line-height: 1.5;">Dilengkapi sistem RBAC (Role-Based Access Control) bertingkat untuk menyaring menu otomatis sesuai dengan peran pengguna.</p>
+                </div>
+                <div class="about-card">
+                  <h4>📊 Pemantauan Berjenjang</h4>
+                  <p style="font-size: 0.85rem; line-height: 1.5;">Dashboard interaktif dengan fitur drill-down dari level BKPH, RPH, TPG, hingga rincian penyadap individu.</p>
+                </div>
+              </div>
+
+              <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; text-align: center; font-size: 0.8rem; color: var(--text-muted);">
+                &copy; 2026 Perum Perhutani Divisi Regional Jawa Tengah. Hak Cipta Dilindungi Undang-Undang.
+              </div>
+            </div>
+          </div>
+        </section>
 
       </div><!-- end content-body -->
     </main>
@@ -1413,7 +1678,8 @@
         <div id="user-password-group" class="form-group">
           <label>Password</label>
           <div style="position: relative; width: 100%;">
-            <input type="password" id="user-master-password" class="form-control" placeholder="Password akun" style="padding-right: 2.5rem;" autocomplete="new-password">
+            <input type="password" id="user-master-password" class="form-control" placeholder="Password akun"
+              style="padding-right: 2.5rem;" autocomplete="new-password">
             <button type="button" onclick="togglePasswordVisibility('user-master-password', this)"
               style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary); font-size: 1.1rem; padding: 4px; display: flex; align-items: center; justify-content: center; line-height: 1;">👁️</button>
           </div>
@@ -1628,6 +1894,7 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Scripts -->
+  <script src="js/seed-data.js?v=3"></script>
   <script src="js/db.js?v=5"></script>
   <script src="js/modules/utils.js?v=6"></script>
   <script src="js/modules/master-bkph.js?v=5"></script>
@@ -1642,9 +1909,9 @@
   <script src="js/modules/target.js?v=5"></script>
   <script src="js/modules/realisasi.js?v=1"></script>
   <script src="js/modules/dashboard.js?v=11"></script>
-  <script src="js/modules/master.js?v=5"></script>
+  <script src="js/modules/master.js?v=6"></script>
   <script src="js/modules/laporan.js?v=2"></script>
-  <script src="js/app.js?v=8"></script>
+  <script src="js/app.js?v=11"></script>
 </body>
 
 </html>
