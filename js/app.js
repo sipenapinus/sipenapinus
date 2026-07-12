@@ -289,7 +289,7 @@ class SipenaApp {
    */
   async handleLogin(e) {
     e.preventDefault();
-    const usernameInput = document.getElementById('login-username').value.trim();
+    const usernameInput = document.getElementById('login-username').value.trim().toLowerCase();
     const passwordInput = document.getElementById('login-password').value;
 
     try {
@@ -397,105 +397,41 @@ class SipenaApp {
     const existingUsers = await window.db.getAll('users');
     if (existingUsers.length > 0) return;
 
-    console.log('[Seeding] Initializing database seeds with hashed passwords...');
+    console.log('[Seeding] Initializing database seeds from seed-data.js...');
 
-    // Hashed password representations
-    const hashAdmin = await hashPassword('admin123');
-    const hashAsper = await hashPassword('asper123');
-    const hashKrph = await hashPassword('krph123');
-    const hashTpg = await hashPassword('tpg123');
-    const hashMandor = await hashPassword('mandor123');
-
-    const auditBase = {
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      created_by: 'system-seed',
-      updated_by: 'system-seed',
-      deleted_at: null
-    };
-
-    const skipSeed = localStorage.getItem('sipena_skip_seed') === '1';
-
-    // 1. Initial Meta
-    await window.db.put('meta', { key: 'last_sync', value: Date.now() });
-    await window.db.put('meta', { key: 'app_version', value: '1.0.0' });
-
-    // 2. Initial Users
-    if (skipSeed) {
+    if (window.SIPENA_SEED_DATA) {
+      const stores = [
+        'meta', 'users', 'bkph', 'rph', 'tpg', 'petak', 'anak_petak',
+        'penyadap_master', 'penugasan', 'ro', 'realisasi', 'kehadiran',
+        'monitoring', 'areal_sadap', 'penyadap'
+      ];
+      for (const store of stores) {
+        const items = window.SIPENA_SEED_DATA[store];
+        if (Array.isArray(items) && items.length > 0) {
+          await window.db.putMany(store, items);
+        }
+      }
+      console.log('[Seeding] Done seeding database from custom seed-data.js.');
+    } else {
+      console.warn('[Seeding] Warning: window.SIPENA_SEED_DATA not found. Seeding fallback admin user...');
+      const hashAdmin = await hashPassword('admin123');
+      const auditBase = {
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_by: 'system-seed',
+        updated_by: 'system-seed',
+        deleted_at: null
+      };
       const adminUser = { id: 'usr-admin', username: 'admin', password_hash: hashAdmin, role: 'admin', nama_lengkap: 'Budi Santoso', nip: '198104122005011002', scope: null, status: 'aktif', ...auditBase };
       await window.db.put('users', adminUser);
-      console.log('[Seeding] Mode data nyata aktif: hanya menyimpan akun admin default.');
-      return;
+      console.log('[Seeding] Created fallback admin user.');
     }
 
-    const mockUsers = [
-      { id: 'usr-admin', username: 'admin', password_hash: hashAdmin, role: 'admin', nama_lengkap: 'Budi Santoso', nip: '198104122005011002', scope: null, status: 'aktif', ...auditBase },
-      { id: 'usr-asper', username: 'asper', password_hash: hashAsper, role: 'bkph', nama_lengkap: 'Heri Wibowo', nip: '197608142002121001', scope: 'bkph-01', status: 'aktif', ...auditBase },
-      { id: 'usr-krph', username: 'krph', password_hash: hashKrph, role: 'krph', nama_lengkap: 'Andi Wijaya', nip: '198801202011031003', scope: 'rph-01', status: 'aktif', ...auditBase },
-      { id: 'usr-tpg', username: 'tpg', password_hash: hashTpg, role: 'tpg', nama_lengkap: 'Supardi', nip: '199205032018021004', scope: 'tpg-01', status: 'aktif', ...auditBase },
-      { id: 'usr-mandor', username: 'mandor', password_hash: hashMandor, role: 'mandor', nama_lengkap: 'Ahmad Subagjo', nip: '198509152008031002', scope: 'tpg-01', status: 'aktif', ...auditBase }
-    ];
-    await window.db.putMany('users', mockUsers);
-
-    // 3. Initial Areal Sadap with targets
-    const mockAreas = [
-      {
-        id: 'ar-01',
-        name: 'Petak 42A - RPH Bantarkawung',
-        rph_id: 'rph-bantarkawung',
-        tpg_id: 'tpg-ciseureuh',
-        mandor_id: 'usr-mandor',
-        target_tahunan: 24000,
-        target_bulanan: {
-          '1': 1600, '2': 1800, '3': 2000, '4': 2200, '5': 2400, '6': 2400,
-          '7': 2200, '8': 2000, '9': 1800, '10': 1800, '11': 1600, '12': 1600
-        },
-        ...auditBase
-      },
-      {
-        id: 'ar-02',
-        name: 'Petak 45C - RPH Bantarkawung',
-        rph_id: 'rph-bantarkawung',
-        tpg_id: 'tpg-cibentang',
-        mandor_id: 'usr-mandor',
-        target_tahunan: 18000,
-        target_bulanan: {
-          '1': 1200, '2': 1300, '3': 1500, '4': 1700, '5': 1800, '6': 1800,
-          '7': 1700, '8': 1500, '9': 1400, '10': 1400, '11': 1350, '12': 1350
-        },
-        ...auditBase
-      }
-    ];
-    await window.db.putMany('areal_sadap', mockAreas);
-
-    // 4. Initial Penyadap
-    const mockPenyadap = [
-      { id: 'pnd-01', name: 'Karya', mandor_id: 'usr-mandor', areal_id: 'ar-01', active: 1, ...auditBase },
-      { id: 'pnd-02', name: 'Sutarman', mandor_id: 'usr-mandor', areal_id: 'ar-01', active: 1, ...auditBase },
-      { id: 'pnd-03', name: 'Tardi', mandor_id: 'usr-mandor', areal_id: 'ar-02', active: 1, ...auditBase },
-      { id: 'pnd-04', name: 'Darsim', mandor_id: 'usr-mandor', areal_id: 'ar-02', active: 1, ...auditBase }
-    ];
-    await window.db.putMany('penyadap', mockPenyadap);
-
-    // 5. Initial Rencana Operasional (RO)
-    const mockROs = [
-      { id: 'ro-01', areal_id: 'ar-01', penyadap_id: 'pnd-01', tahun: 2026, bulan: 7, periode: 1, kesanggupan: 450, status: 'disetujui', sync_status: 'synced', ...auditBase },
-      { id: 'ro-02', areal_id: 'ar-01', penyadap_id: 'pnd-02', tahun: 2026, bulan: 7, periode: 1, kesanggupan: 400, status: 'disetujui', sync_status: 'synced', ...auditBase },
-      { id: 'ro-03', areal_id: 'ar-02', penyadap_id: 'pnd-03', tahun: 2026, bulan: 7, periode: 1, kesanggupan: 350, status: 'disetujui', sync_status: 'synced', ...auditBase },
-      { id: 'ro-04', areal_id: 'ar-02', penyadap_id: 'pnd-04', tahun: 2026, bulan: 7, periode: 1, kesanggupan: 300, status: 'disetujui', sync_status: 'synced', ...auditBase }
-    ];
-    await window.db.putMany('ro', mockROs);
-
-    // 6. Initial Realisasi
-    const mockRealisasi = [
-      { id: 'rl-01', areal_id: 'ar-01', penyadap_id: 'pnd-01', tpg_id: 'tpg-ciseureuh', tanggal: '2026-07-05', berat_kotor: 260, berat_bersih: 250, mutu: 'Premium', status: 'verified', sync_status: 'synced', ...auditBase },
-      { id: 'rl-02', areal_id: 'ar-01', penyadap_id: 'pnd-02', tpg_id: 'tpg-ciseureuh', tanggal: '2026-07-06', berat_kotor: 215, berat_bersih: 205, mutu: 'Super Premium', status: 'verified', sync_status: 'synced', ...auditBase },
-      { id: 'rl-03', areal_id: 'ar-02', penyadap_id: 'pnd-03', tpg_id: 'tpg-cibentang', tanggal: '2026-07-05', berat_kotor: 180, berat_bersih: 175, mutu: '1', status: 'verified', sync_status: 'synced', ...auditBase },
-      { id: 'rl-04', areal_id: 'ar-02', penyadap_id: 'pnd-04', tpg_id: 'tpg-cibentang', tanggal: '2026-07-07', berat_kotor: 160, berat_bersih: 155, mutu: '2', status: 'verified', sync_status: 'synced', ...auditBase }
-    ];
-    await window.db.putMany('realisasi', mockRealisasi);
-
-    console.log('[Seeding] Done seeding initial database structure.');
+    // Ensure metadata
+    const hasMetaLastSync = await window.db.get('meta', 'last_sync');
+    if (!hasMetaLastSync) await window.db.put('meta', { key: 'last_sync', value: Date.now() });
+    const hasMetaAppVersion = await window.db.get('meta', 'app_version');
+    if (!hasMetaAppVersion) await window.db.put('meta', { key: 'app_version', value: '1.0.0' });
   }
 
   // --- ADMINISTRATOR USER CRUD FUNCTIONS (Moved to MasterUser) ---
@@ -640,6 +576,8 @@ class SipenaApp {
           this.loadRealisasiData();
         } else if (targetSectionId === 'laporan') {
           if (window.LaporanModule) window.LaporanModule.init();
+        } else if (targetSectionId === 'panduan') {
+          this.switchPanduanTab('guide');
         } else if (targetSectionId === 'pengaturan') {
           if (this.currentUser && this.currentUser.role === 'admin') {
             this.loadUsers();
@@ -933,6 +871,49 @@ class SipenaApp {
     } catch (err) {
       console.error('[Restore Error]', err);
       this.showToast('Gagal memulihkan database: ' + err.message, 'danger');
+    }
+  }
+
+  /**
+   * Switch between sub-tabs in Panduan & Tentang page
+   */
+  switchPanduanTab(tab) {
+    const btnGuide = document.getElementById('btn-panduan-guide');
+    const btnAbout = document.getElementById('btn-panduan-about');
+    const tabGuide = document.getElementById('panduan-tab-guide');
+    const tabAbout = document.getElementById('panduan-tab-about');
+
+    if (!btnGuide || !btnAbout || !tabGuide || !tabAbout) return;
+
+    if (tab === 'guide') {
+      btnGuide.classList.add('active');
+      btnAbout.classList.remove('active');
+      tabGuide.classList.add('active');
+      tabAbout.classList.remove('active');
+    } else {
+      btnGuide.classList.remove('active');
+      btnAbout.classList.add('active');
+      tabGuide.classList.remove('active');
+      tabAbout.classList.add('active');
+    }
+  }
+
+  /**
+   * Toggle accordion items in Panduan page
+   */
+  togglePanduanAccordion(id) {
+    const item = document.getElementById(id);
+    if (!item) return;
+
+    const isOpen = item.classList.contains('open');
+    
+    // Close other items
+    document.querySelectorAll('.panduan-item').forEach(el => {
+      el.classList.remove('open');
+    });
+
+    if (!isOpen) {
+      item.classList.add('open');
     }
   }
 }
