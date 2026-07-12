@@ -238,10 +238,34 @@ const MasterImport = (() => {
       headerMap[norm] = h;
     });
 
+    const customMapping = {
+      koderph: ['kode_rph', 'kode'],
+      namarph: ['nama'],
+      bkph: ['kode_bkph'],
+      kodetpg: ['kode_tpg', 'kode'],
+      namatpg: ['nama'],
+      rph: ['kode_rph'],
+      nopenyadap: ['nomor'],
+      nomorpenyadap: ['nomor'],
+      namalengkap: ['nama'],
+      nama: ['nama_lengkap'],
+      wilayah: ['scope']
+    };
+
     for (const key of Object.keys(row)) {
       const normKey = key.toLowerCase().replace(/[\s_-]/g, '');
-      if (headerMap[normKey]) {
-        mapped[headerMap[normKey]] = row[key];
+      let mappedHeader = headerMap[normKey];
+      
+      if (!mappedHeader && customMapping[normKey]) {
+        const targets = customMapping[normKey];
+        const matchedTarget = targets.find(t => headerMap[t.toLowerCase().replace(/[\s_-]/g, '')]);
+        if (matchedTarget) {
+          mappedHeader = headerMap[matchedTarget.toLowerCase().replace(/[\s_-]/g, '')];
+        }
+      }
+      
+      if (mappedHeader) {
+        mapped[mappedHeader] = row[key];
       } else {
         mapped[key] = row[key];
       }
@@ -327,8 +351,11 @@ const MasterImport = (() => {
     const nama     = String(row.nama || '').trim();
     let status     = String(row.status || 'aktif').trim();
 
-    // Cari BKPH berdasarkan kode_bkph
-    const bkph = data.bkph_all.find(b => b.kode_bkph === kodeBkph);
+    // Cari BKPH berdasarkan kode_bkph atau nama_bkph
+    const bkph = data.bkph_all.find(b => 
+      b.kode_bkph.toUpperCase() === kodeBkph || 
+      b.nama_bkph.toUpperCase() === kodeBkph
+    );
     if (!kodeBkph) {
       errors.push(_err(rowNum, 'kode_bkph', 'Kode BKPH wajib diisi'));
     } else if (!bkph) {
@@ -378,8 +405,11 @@ const MasterImport = (() => {
     const nama    = String(row.nama || '').trim();
     let status    = String(row.status || 'aktif').trim();
 
-    // Cari RPH berdasarkan kode
-    const rph = data.rph_all.find(r => r.kode === kodeRph);
+    // Cari RPH berdasarkan kode atau nama
+    const rph = data.rph_all.find(r => 
+      r.kode.toUpperCase() === kodeRph || 
+      r.nama.toUpperCase() === kodeRph
+    );
     if (!kodeRph) {
       errors.push(_err(rowNum, 'kode_rph', 'Kode RPH wajib diisi'));
     } else if (!rph) {
@@ -517,19 +547,21 @@ const MasterImport = (() => {
     if (!kodeRph) errors.push(_err(rowNum, 'kode_rph', 'Kode RPH wajib diisi'));
     if (!kodeTpg) errors.push(_err(rowNum, 'kode_tpg', 'Kode TPG wajib diisi'));
 
-    // Cari RPH berdasarkan kode (case-insensitive)
+    // Cari RPH berdasarkan kode atau nama (case-insensitive)
     const rphObj = data.rph_all.find(r =>
-      r.kode && r.kode.toUpperCase() === kodeRph
+      (r.kode && r.kode.toUpperCase() === kodeRph) ||
+      (r.nama && r.nama.toUpperCase() === kodeRph)
     );
     if (kodeRph && !rphObj)
-      errors.push(_err(rowNum, 'kode_rph', `RPH dengan kode "${kodeRph}" tidak ditemukan. Cek di Master RPH.`));
+      errors.push(_err(rowNum, 'kode_rph', `RPH dengan kode/nama "${kodeRph}" tidak ditemukan. Cek di Master RPH.`));
 
-    // Cari TPG berdasarkan kode (case-insensitive)
+    // Cari TPG berdasarkan kode atau nama (case-insensitive)
     const tpgObj = data.tpg_all.find(t =>
-      t.kode && t.kode.toUpperCase() === kodeTpg
+      (t.kode && t.kode.toUpperCase() === kodeTpg) ||
+      (t.nama && t.nama.toUpperCase() === kodeTpg)
     );
     if (kodeTpg && !tpgObj)
-      errors.push(_err(rowNum, 'kode_tpg', `TPG dengan kode "${kodeTpg}" tidak ditemukan. Cek di Master TPG.`));
+      errors.push(_err(rowNum, 'kode_tpg', `TPG dengan kode/nama "${kodeTpg}" tidak ditemukan. Cek di Master TPG.`));
 
     // Validasi TPG harus berada di bawah RPH yang dipilih
     if (rphObj && tpgObj && tpgObj.rph_id !== rphObj.id)
