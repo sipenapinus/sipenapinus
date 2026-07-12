@@ -245,6 +245,7 @@ const MasterImport = (() => {
       kodetpg: ['kode_tpg', 'kode'],
       namatpg: ['nama'],
       rph: ['kode_rph'],
+      tpg: ['kode_tpg'],
       nopenyadap: ['nomor'],
       nomorpenyadap: ['nomor'],
       namalengkap: ['nama'],
@@ -547,21 +548,23 @@ const MasterImport = (() => {
     if (!kodeRph) errors.push(_err(rowNum, 'kode_rph', 'Kode RPH wajib diisi'));
     if (!kodeTpg) errors.push(_err(rowNum, 'kode_tpg', 'Kode TPG wajib diisi'));
 
-    // Cari RPH berdasarkan kode atau nama (case-insensitive)
+    // Cari RPH berdasarkan ID, kode, atau nama (case-insensitive)
     const rphObj = data.rph_all.find(r =>
+      (r.id && r.id.toUpperCase() === kodeRph) ||
       (r.kode && r.kode.toUpperCase() === kodeRph) ||
       (r.nama && r.nama.toUpperCase() === kodeRph)
     );
     if (kodeRph && !rphObj)
-      errors.push(_err(rowNum, 'kode_rph', `RPH dengan kode/nama "${kodeRph}" tidak ditemukan. Cek di Master RPH.`));
+      errors.push(_err(rowNum, 'kode_rph', `RPH dengan ID/kode/nama "${kodeRph}" tidak ditemukan. Cek di Master RPH.`));
 
-    // Cari TPG berdasarkan kode atau nama (case-insensitive)
+    // Cari TPG berdasarkan ID, kode, atau nama (case-insensitive)
     const tpgObj = data.tpg_all.find(t =>
+      (t.id && t.id.toUpperCase() === kodeTpg) ||
       (t.kode && t.kode.toUpperCase() === kodeTpg) ||
       (t.nama && t.nama.toUpperCase() === kodeTpg)
     );
     if (kodeTpg && !tpgObj)
-      errors.push(_err(rowNum, 'kode_tpg', `TPG dengan kode/nama "${kodeTpg}" tidak ditemukan. Cek di Master TPG.`));
+      errors.push(_err(rowNum, 'kode_tpg', `TPG dengan ID/kode/nama "${kodeTpg}" tidak ditemukan. Cek di Master TPG.`));
 
     // Validasi TPG harus berada di bawah RPH yang dipilih
     if (rphObj && tpgObj && tpgObj.rph_id !== rphObj.id)
@@ -665,9 +668,21 @@ const MasterImport = (() => {
     const errors = [];
     if (!row.nama_lengkap) errors.push(_err(rowNum, 'nama_lengkap', 'Nama lengkap wajib diisi'));
     if (!row.username)     errors.push(_err(rowNum, 'username',     'Username wajib diisi'));
-    if (!row.password)     errors.push(_err(rowNum, 'password',     'Password wajib diisi'));
+    
+    let password = String(row.password || '').trim();
+    if (!password) {
+      const cleanUsername = String(row.username || 'user').trim().toLowerCase();
+      password = cleanUsername + '123';
+      if (password.length < 6) password = password.padEnd(6, '0');
+    }
 
-    const role = String(row.role || 'mandor').trim().toLowerCase();
+    let role = String(row.role || 'mandor').trim().toLowerCase();
+    if (role.includes('admin')) role = 'admin';
+    else if (role.includes('asper') || role.includes('kbph') || role.includes('bkph')) role = 'bkph';
+    else if (role.includes('krph')) role = 'krph';
+    else if (role.includes('tpg') || role.includes('mandor tpg')) role = 'tpg';
+    else if (role.includes('sadap') || role.includes('mandor')) role = 'mandor';
+
     const validRoles = ['admin', 'bkph', 'krph', 'tpg', 'mandor'];
     if (row.role && !validRoles.includes(role))
       errors.push(_err(rowNum, 'role', `Role tidak valid: "${row.role}". Pilih: ${validRoles.join(', ')}`));
@@ -687,7 +702,7 @@ const MasterImport = (() => {
     if (errors.length) return { errors };
 
     const _hp = typeof window.hashPassword === 'function' ? window.hashPassword : hashPassword;
-    const password_hash = await _hp(String(row.password));
+    const password_hash = await _hp(password);
     return { record: {
       id: U().uuid(),
       nama_lengkap: String(row.nama_lengkap).trim(),
