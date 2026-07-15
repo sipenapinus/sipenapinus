@@ -12,6 +12,7 @@ const MasterPetak = (() => {
     const allPetak = await window.db.getAllActive('petak');
     const allRph   = await window.db.getAllActive('rph');
     const allTpg   = await window.db.getAllActive('tpg');
+    const allUsers = await window.db.getAllActive('users');
 
     // ── Isi dropdown filter RPH (hanya isi ulang isi opsinya, jaga value) ──
     const rphSel = document.getElementById('petak-filter-rph');
@@ -32,7 +33,14 @@ const MasterPetak = (() => {
         visibleTpg.map(t => `<option value="${t.id}" ${t.id === curTpg ? 'selected' : ''}>${t.nama}</option>`).join('');
     }
 
+    const user = window.app && window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : '';
+
     let data = allPetak;
+    if ((role === 'tpg' || role === 'mandor') && scope) {
+      data = data.filter(r => r.tpg_id === scope);
+    }
     if (state.filterRph) data = data.filter(r => r.rph_id === state.filterRph);
     if (state.filterTpg) data = data.filter(r => r.tpg_id === state.filterTpg);
     data = U().filterAndSort(data, state.search, ['nomor', 'kelas_hutan', 'keterangan'], state.sortKey, state.sortDir);
@@ -47,10 +55,12 @@ const MasterPetak = (() => {
       tbody.innerHTML = pager.rows.map(row => {
         const rph = allRph.find(r => r.id === row.rph_id);
         const tpg = allTpg.find(t => t.id === row.tpg_id);
+        const mandor = allUsers.find(u => u.id === row.mandor_id);
         return `<tr>
           <td><strong>${row.nomor}</strong></td>
           <td>${rph ? rph.nama : '—'}</td>
           <td>${tpg ? tpg.nama : '—'}</td>
+          <td>${mandor ? mandor.nama_lengkap : '—'}</td>
           <td>${(row.luas_ha || 0).toFixed(2)} ha</td>
           <td>${row.jumlah_pohon || 0}</td>
           <td style="color:var(--text-secondary)">${row.kelas_hutan || '—'}</td>
@@ -78,17 +88,54 @@ const MasterPetak = (() => {
   async function _loadRphSelect(selectId, selectedId = '') {
     const sel = document.getElementById(selectId);
     if (!sel) return;
-    const all = await window.db.getAllActive('rph');
-    sel.innerHTML = `<option value="">— Pilih RPH —</option>` +
-      all.map(r => `<option value="${r.id}" ${r.id === selectedId ? 'selected' : ''}>${r.nama}</option>`).join('');
+    const user = window.app && window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : '';
+    
+    let all = await window.db.getAllActive('rph');
+    if ((role === 'tpg' || role === 'mandor') && scope) {
+      const allTpg = await window.db.getAllActive('tpg');
+      const myTpg = allTpg.find(t => t.id === scope);
+      if (myTpg) {
+        selectedId = myTpg.rph_id;
+        all = all.filter(r => r.id === myTpg.rph_id);
+      }
+    }
+
+    sel.innerHTML = (role === 'tpg' || role === 'mandor') && scope
+      ? all.map(r => `<option value="${r.id}" selected>${r.nama}</option>`).join('')
+      : `<option value="">— Pilih RPH —</option>` + all.map(r => `<option value="${r.id}" ${r.id === selectedId ? 'selected' : ''}>${r.nama}</option>`).join('');
   }
 
   async function _loadTpgSelect(selectId, selectedId = '') {
     const sel = document.getElementById(selectId);
     if (!sel) return;
-    const all = await window.db.getAllActive('tpg');
-    sel.innerHTML = `<option value="">— Pilih TPG —</option>` +
-      all.map(t => `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.nama}</option>`).join('');
+    const user = window.app && window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : '';
+    
+    let all = await window.db.getAllActive('tpg');
+    if ((role === 'tpg' || role === 'mandor') && scope) {
+      all = all.filter(t => t.id === scope);
+      selectedId = scope;
+    }
+
+    sel.innerHTML = (role === 'tpg' || role === 'mandor') && scope
+      ? all.map(t => `<option value="${t.id}" selected>${t.nama}</option>`).join('')
+      : `<option value="">— Pilih TPG —</option>` + all.map(t => `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.nama}</option>`).join('');
+  }
+
+  async function _loadMandorSelect(selectId, tpgId, selectedId = '') {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    if (!tpgId) {
+      sel.innerHTML = `<option value="">— Pilih TPG Terlebih Dahulu —</option>`;
+      return;
+    }
+    const allUsers = await window.db.getAllActive('users');
+    const mandors = allUsers.filter(u => u.role === 'mandor' && u.scope === tpgId);
+    sel.innerHTML = `<option value="">— Pilih Mandor Sadap —</option>` +
+      mandors.map(m => `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>${m.nama_lengkap} (${m.username})</option>`).join('');
   }
 
   async function openAdd() {
@@ -97,6 +144,16 @@ const MasterPetak = (() => {
     document.getElementById('petak-modal-title').textContent = 'Tambah Petak';
     await _loadRphSelect('petak-rph');
     await _loadTpgSelect('petak-tpg');
+    
+    const user = window.app && window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : '';
+    if ((role === 'tpg' || role === 'mandor') && scope) {
+      await _loadMandorSelect('petak-mandor', scope);
+    } else {
+      await _loadMandorSelect('petak-mandor', '');
+    }
+    
     U().openModal('petak-modal');
   }
 
@@ -112,6 +169,7 @@ const MasterPetak = (() => {
     document.getElementById('petak-modal-title').textContent = 'Edit Petak';
     await _loadRphSelect('petak-rph', row.rph_id);
     await _loadTpgSelect('petak-tpg', row.tpg_id);
+    await _loadMandorSelect('petak-mandor', row.tpg_id, row.mandor_id);
     U().openModal('petak-modal');
   }
 
@@ -121,6 +179,7 @@ const MasterPetak = (() => {
     const existing = await window.db.get('petak', id);
     const rph_id   = document.getElementById('petak-rph').value;
     const tpg_id   = document.getElementById('petak-tpg').value;
+    const mandor_id = document.getElementById('petak-mandor').value;
     const nomor    = document.getElementById('petak-nomor').value.trim();
     const luas_ha  = parseFloat(document.getElementById('petak-luas').value) || 0;
     const jumlah_pohon = parseInt(document.getElementById('petak-pohon').value) || 0;
@@ -136,6 +195,7 @@ const MasterPetak = (() => {
 
     const record = {
       id, rph_id, tpg_id, nomor, luas_ha, jumlah_pohon,
+      mandor_id,
       kelas_hutan: document.getElementById('petak-kelas').value.trim(),
       keterangan:  document.getElementById('petak-keterangan').value.trim(),
       ...U().makeAudit(U().currentActorId(), existing)
@@ -154,6 +214,7 @@ const MasterPetak = (() => {
       luas_ha,
       jumlah_pohon,
       tpg_id,
+      mandor_id,
       keterangan: record.keterangan,
       ...U().makeAudit(U().currentActorId(), existingAp)
     };
@@ -222,13 +283,16 @@ const MasterPetak = (() => {
     const allPetak = await window.db.getAllActive('petak');
     const allRph   = await window.db.getAllActive('rph');
     const allTpg   = await window.db.getAllActive('tpg');
+    const allUsers = await window.db.getAllActive('users');
     const rows = allPetak.map(r => {
       const rph = allRph.find(x => x.id === r.rph_id);
       const tpg = allTpg.find(t => t.id === r.tpg_id);
+      const mandor = allUsers.find(u => u.id === r.mandor_id);
       return {
         Nomor: r.nomor,
         RPH: rph ? rph.nama : r.rph_id,
         TPG: tpg ? tpg.nama : r.tpg_id,
+        Mandor_Sadap: mandor ? mandor.nama_lengkap : '',
         Luas_Ha: r.luas_ha || 0,
         Jumlah_Pohon: r.jumlah_pohon || 0,
         Tahun_Tanam: r.kelas_hutan || '',
@@ -241,6 +305,16 @@ const MasterPetak = (() => {
     XLSX.writeFile(wb, `Master_Petak_${U().today()}.xlsx`);
     U().showToast('Export Excel berhasil');
   }
+
+  // Bind change event on TPG select to update Mandor dropdown
+  setTimeout(() => {
+    const tpgSel = document.getElementById('petak-tpg');
+    if (tpgSel) {
+      tpgSel.addEventListener('change', async (e) => {
+        await _loadMandorSelect('petak-mandor', e.target.value);
+      });
+    }
+  }, 100);
 
   return { render, openAdd, openEdit, save, confirmDelete, onSearch, onFilter, onFilterRph, exportExcel };
 })();

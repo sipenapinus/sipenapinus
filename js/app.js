@@ -267,8 +267,12 @@ class SipenaApp {
       const sub = btn.getAttribute('data-tab');
       let btnVisible = true;
       if ((role === 'mandor' || role === 'tpg') && sub) {
-        // Hanya sembunyikan sub-tab Data Master yang bukan Penyadap/Penugasan
-        if (sub !== 'penyadap' && sub !== 'penugasan') btnVisible = false;
+        // Hanya sembunyikan sub-tab Data Master yang bukan Penyadap/Penugasan (dan Petak jika Mandor TPG)
+        if (role === 'tpg') {
+          if (sub !== 'penyadap' && sub !== 'penugasan' && sub !== 'petak') btnVisible = false;
+        } else {
+          if (sub !== 'penyadap' && sub !== 'penugasan') btnVisible = false;
+        }
       }
       btn.style.display = btnVisible ? 'inline-flex' : 'none';
     });

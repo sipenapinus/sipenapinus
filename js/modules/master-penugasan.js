@@ -67,6 +67,17 @@ const MasterPenugasan = (() => {
       all.map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${p.nomor} — ${p.nama} (${p.status})</option>`).join('');
   }
 
+  let cachedAnakPetak = [];
+
+  function renderAnakPetakOptions(selectEl, selectedId = '', query = '') {
+    const filtered = cachedAnakPetak.filter(item => {
+      return item.label.toLowerCase().includes(query);
+    });
+
+    selectEl.innerHTML = `<option value="">— Pilih Petak —</option>` +
+      filtered.map(i => `<option value="${i.id}" ${i.id === selectedId ? 'selected' : ''}>${i.label}</option>`).join('');
+  }
+
   async function _loadAnakPetakSelect(selId, selectedId = '') {
     const sel = document.getElementById(selId);
     if (!sel) return;
@@ -80,15 +91,33 @@ const MasterPenugasan = (() => {
     let filteredAP = allAP;
     
     if ((role === 'mandor' || role === 'tpg') && scope) {
-      filteredAP = allAP.filter(ap => ap.tpg_id === scope);
+      filteredAP = allAP.filter(ap => {
+        if (ap.tpg_id !== scope) return false;
+        if (role === 'mandor' && ap.mandor_id !== user.id) return false;
+        return true;
+      });
     }
 
-    sel.innerHTML = `<option value="">— Pilih Petak —</option>` +
-      filteredAP.map(ap => {
-        const p = allPetak.find(x => x.id === ap.petak_id);
-        const label = p ? `Petak ${p.nomor} (${ap.luas_ha || 0} ha)` : ap.huruf;
-        return `<option value="${ap.id}" ${ap.id === selectedId ? 'selected' : ''}>${label}</option>`;
-      }).join('');
+    // Cache the list of option data
+    cachedAnakPetak = filteredAP.map(ap => {
+      const p = allPetak.find(x => x.id === ap.petak_id);
+      const label = p ? `Petak ${p.nomor} (${ap.luas_ha || 0} ha)` : ap.huruf;
+      return { id: ap.id, label: label };
+    });
+
+    // Populate initially
+    renderAnakPetakOptions(sel, selectedId);
+
+    // Bind search event
+    const searchInput = document.getElementById('pgn-petak-search');
+    if (searchInput) {
+      searchInput.value = ''; // Reset search input
+      searchInput.oninput = (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        const currentSelected = sel.value; // Read currently selected value
+        renderAnakPetakOptions(sel, currentSelected, query);
+      };
+    }
   }
 
   async function openAdd() {
