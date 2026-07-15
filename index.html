@@ -439,6 +439,7 @@
                       <th onclick="MasterPetak.onSort('nomor')">No. Petak</th>
                       <th>RPH</th>
                       <th>TPG</th>
+                      <th>Mandor Sadap</th>
                       <th>Luas (Ha)</th>
                       <th>Jumlah Pohon</th>
                       <th onclick="MasterPetak.onSort('kelas_hutan')">Tahun Tanam</th>
@@ -1473,6 +1474,12 @@
         <div class="form-group"><label>RPH</label><select id="petak-rph" class="form-control" required></select></div>
         <div class="form-group"><label>TPG (Tempat Penimbangan Getah)</label><select id="petak-tpg" class="form-control"
             required></select></div>
+        <div class="form-group" id="petak-mandor-group">
+          <label>Mandor Sadap Penanggung Jawab</label>
+          <select id="petak-mandor" class="form-control">
+            <option value="">— Pilih Mandor Sadap —</option>
+          </select>
+        </div>
         <div class="form-group"><label>Nomor Petak</label><input id="petak-nomor" class="form-control" required
             placeholder="Contoh: 42"></div>
         <div class="form-grid-2">
@@ -1567,7 +1574,10 @@
         <input type="hidden" id="penugasan-id">
         <div class="form-group"><label>Penyadap</label><select id="pgn-penyadap" class="form-control" required></select>
         </div>
-        <div class="form-group"><label>Petak</label><select id="pgn-anak-petak" class="form-control" required></select>
+        <div class="form-group">
+          <label>Petak</label>
+          <input type="text" id="pgn-petak-search" class="form-control" placeholder="🔍 Ketik untuk mencari Petak..." style="margin-bottom: 0.5rem;" autocomplete="off">
+          <select id="pgn-anak-petak" class="form-control" required></select>
         </div>
         <div class="form-group"><label>Target</label>
           <input type="number" id="pgn-persen" class="form-control" required min="1" max="100" value="100"
