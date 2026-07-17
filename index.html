@@ -958,14 +958,24 @@
             </div>
 
             <!-- Judul Laporan -->
-            <div style="text-align:center;margin-bottom:1.5rem;">
-              <h2 id="rpt-title"
-                style="margin:0;font-size:1.25rem;font-weight:700;color:#111;text-transform:uppercase;">LAPORAN
-                REALISASI PRODUKSI GETAH</h2>
-              <p id="rpt-tpg-row"
-                style="display:none;margin:4px 0 0 0;font-size:1rem;font-weight:700;color:#111;text-transform:uppercase;">
-              </p>
-              <p id="rpt-subtitle" style="margin:4px 0 0 0;font-size:.85rem;color:#444;font-weight:500;">Periode: —</p>
+            <div
+              style="position:relative;min-height:100px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:center;">
+              <!-- Logo Mini Perhutani untuk Buku Sadap -->
+              <div id="rpt-logo-mini"
+                style="display:none;position:absolute;left:0;top:50%;transform:translateY(-50%);width:115px;height:95px;">
+                <img src="assets/logo.svg" alt="Logo" style="width:100%;height:100%;object-fit:contain;">
+              </div>
+              <div style="text-align:center;padding:0 130px;">
+                <h2 id="rpt-title"
+                  style="margin:0;font-size:1.2rem;font-weight:700;color:#111;text-transform:uppercase;line-height:1.45;">
+                  LAPORAN
+                  REALISASI PRODUKSI GETAH</h2>
+                <p id="rpt-tpg-row"
+                  style="display:none;margin:4px 0 0 0;font-size:1rem;font-weight:700;color:#111;text-transform:uppercase;">
+                </p>
+                <p id="rpt-subtitle" style="margin:4px 0 0 0;font-size:.85rem;color:#444;font-weight:500;">Periode: —
+                </p>
+              </div>
             </div>
 
             <!-- Tabel Laporan -->
@@ -1340,7 +1350,8 @@
                       <li><strong>Input Massal:</strong> Gunakan menu <strong>Import Excel</strong> di tab masing-masing
                         jika ingin memasukkan data dalam jumlah besar. Download template resmi terlebih dahulu.</li>
                       <li><strong>Backup Berkala:</strong> Lakukan backup data secara periodik lewat menu
-                        <strong>Pengaturan -> Cadangkan Database</strong> untuk mengantisipasi kerusakan data.</li>
+                        <strong>Pengaturan -> Cadangkan Database</strong> untuk mengantisipasi kerusakan data.
+                      </li>
                     </ol>
                   </div>
                 </div>
@@ -1453,6 +1464,20 @@
                   <h4>📊 Pemantauan Berjenjang</h4>
                   <p style="font-size: 0.85rem; line-height: 1.5;">Dashboard interaktif dengan fitur drill-down dari
                     level BKPH, RPH, TPG, hingga rincian penyadap individu.</p>
+                </div>
+                <div class="about-card"
+                  style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--primary); background: rgba(64, 192, 87, 0.05); margin-top: 1rem; flex-wrap: wrap; gap: 1rem;">
+                  <div style="flex: 1; min-width: 250px;">
+                    <h4
+                      style="margin-bottom: 0.5rem; color: var(--primary); display: flex; align-items: center; gap: 0.5rem;">
+                      💾 Cadangkan Data Mandiri (Backup)</h4>
+                    <p style="font-size: 0.85rem; line-height: 1.5; margin: 0; color: var(--text-secondary);">
+                      Gunakan fitur ini untuk mengunduh salinan cadangan seluruh data lokal Anda dalam bentuk berkas
+                      (.json). Simpan berkas ini di flashdisk untuk mengamankan data jika terjadi kerusakan perangkat.
+                    </p>
+                  </div>
+                  <button class="btn btn-primary" onclick="app.backupDatabase()"
+                    style="flex-shrink: 0; padding: 0.6rem 1.2rem; font-weight: 600;">📥 Cadangkan Sekarang</button>
                 </div>
               </div>
 
@@ -2025,8 +2050,8 @@
   <script src="js/modules/realisasi.js?v=3"></script>
   <script src="js/modules/dashboard.js?v=19"></script>
   <script src="js/modules/master.js?v=6"></script>
-  <script src="js/modules/laporan.js?v=13"></script>
-  <script src="js/app.js?v=12"></script>
+  <script src="js/modules/laporan.js?v=15"></script>
+  <script src="js/app.js?v=13"></script>
 </body>
 
 </html>
