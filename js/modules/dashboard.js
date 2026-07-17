@@ -83,6 +83,11 @@ const DashboardModule = (() => {
 
   // ── Inisialisasi ──────────────────────────────────────────────
   async function init() {
+    const today = new Date();
+    state.tahun = today.getFullYear();
+    state.bulan = today.getMonth() + 1;
+    state.periode = today.getDate() <= 15 ? 1 : 2;
+
     state.drillPath = await getInitialDrillPath();
     state.search = '';
     state.filterStatus = '';
@@ -363,9 +368,9 @@ const DashboardModule = (() => {
       return rlDay >= 16;
     }).reduce((sum, rl) => sum + (rl.berat_bersih || 0), 0);
 
-    const pctTahun = targetTahun > 0 ? ((realTahun / targetTahun) * 100).toFixed(1) : 0;
-    const pctRoTahun = targetTahun > 0 ? ((roPeriode / targetTahun) * 100).toFixed(1) : 0;
-    const pctReal = targetTahun > 0 ? ((realPeriode / targetTahun) * 100).toFixed(1) : 0;
+    const pctTahun = targetTahun > 0 ? ((realTahun / targetTahun) * 100).toFixed(2) : '0.00';
+    const pctRoTahun = targetTahun > 0 ? ((roPeriode / targetTahun) * 100).toFixed(2) : '0.00';
+    const pctReal = targetTahun > 0 ? ((realPeriode / targetTahun) * 100).toFixed(2) : '0.00';
 
     const st = getStatusIndicator(realPeriode, targetPeriode);
 
@@ -400,7 +405,7 @@ const DashboardModule = (() => {
         .filter(p => p.rph_id === r.id)
         .reduce((sum, p) => sum + (p.luas_ha || 0), 0);
 
-      const pct = targetKg > 0 ? ((realRph / targetKg) * 100).toFixed(1) : 0;
+      const pct = targetKg > 0 ? ((realRph / targetKg) * 100).toFixed(2) : '0.00';
       const st  = getStatusIndicator(realRph, targetKg);
 
       if (state.filterStatus && st.cls !== `status-${state.filterStatus}`) return '';
@@ -502,9 +507,9 @@ const DashboardModule = (() => {
       return rlDay >= 16;
     }).reduce((sum, rl) => sum + (rl.berat_bersih || 0), 0);
 
-    const pctTahun = targetTahun > 0 ? ((realTahun / targetTahun) * 100).toFixed(1) : 0;
-    const pctRoTahun = targetTahun > 0 ? ((roPeriode / targetTahun) * 100).toFixed(1) : 0;
-    const pctReal = targetTahun > 0 ? ((realPeriode / targetTahun) * 100).toFixed(1) : 0;
+    const pctTahun = targetTahun > 0 ? ((realTahun / targetTahun) * 100).toFixed(2) : '0.00';
+    const pctRoTahun = targetTahun > 0 ? ((roPeriode / targetTahun) * 100).toFixed(2) : '0.00';
+    const pctReal = targetTahun > 0 ? ((realPeriode / targetTahun) * 100).toFixed(2) : '0.00';
 
     const st = getStatusIndicator(realPeriode, targetPeriode);
 
@@ -539,7 +544,7 @@ const DashboardModule = (() => {
         .filter(p => p.tpg_id === t.id)
         .reduce((sum, p) => sum + (p.luas_ha || 0), 0);
 
-      const pct = targetKg > 0 ? ((realTpg / targetKg) * 100).toFixed(1) : 0;
+      const pct = targetKg > 0 ? ((realTpg / targetKg) * 100).toFixed(2) : '0.00';
       const st  = getStatusIndicator(realTpg, targetKg);
 
       if (state.filterStatus && st.cls !== `status-${state.filterStatus}`) return '';
@@ -641,9 +646,9 @@ const DashboardModule = (() => {
       return rlDay >= 16;
     }).reduce((sum, rl) => sum + (rl.berat_bersih || 0), 0);
 
-    const pctTahun = targetTahun > 0 ? ((realTahun / targetTahun) * 100).toFixed(1) : 0;
-    const pctRoTahun = targetTahun > 0 ? ((roPeriode / targetTahun) * 100).toFixed(1) : 0;
-    const pctReal = targetTahun > 0 ? ((realPeriode / targetTahun) * 100).toFixed(1) : 0;
+    const pctTahun = targetTahun > 0 ? ((realTahun / targetTahun) * 100).toFixed(2) : '0.00';
+    const pctRoTahun = targetTahun > 0 ? ((roPeriode / targetTahun) * 100).toFixed(2) : '0.00';
+    const pctReal = targetTahun > 0 ? ((realPeriode / targetTahun) * 100).toFixed(2) : '0.00';
 
     const st = getStatusIndicator(realPeriode, targetPeriode);
 
@@ -701,7 +706,7 @@ const DashboardModule = (() => {
             <strong style="font-size:1.25rem;">
               ${realMdr.toLocaleString('id-ID')} / ${targetKg.toLocaleString('id-ID')} kg
               <span style="font-size:0.85rem;font-weight:600;color:${targetKg > 0 ? (realMdr/targetKg >= 1 ? 'var(--primary)' : realMdr/targetKg >= 0.8 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-secondary)'};">
-                (${targetKg > 0 ? ((realMdr/targetKg)*100).toFixed(1) : 0}%)
+                (${targetKg > 0 ? ((realMdr/targetKg)*100).toFixed(2) : '0.00'}%)
               </span>
             </strong>
             <div class="progress-bar-container" style="margin-top:.5rem;">
@@ -780,7 +785,7 @@ const DashboardModule = (() => {
     const sumTargetTahun = apTargetList.filter(x => myApIds.includes(x.anak_petak_id)).reduce((sum, x) => sum + (x.target_kg || 0), 0);
 
 
-    const targetPeriode = sumTargetTahun / 12;
+    const targetPeriode = Math.round(sumTargetTahun / 12);
 
     // 2. Rencana Operasional (RO) Periode ini
     const roPeriodeList = allRO.filter(ro => 
@@ -820,8 +825,16 @@ const DashboardModule = (() => {
       .reduce((sum, x) => sum + (x.berat_bersih || 0), 0);
 
     // Progress
-    const roProgress = roPeriode > 0 ? ((realPeriode / roPeriode) * 100).toFixed(1) : '0';
-    const targetProgress = targetPeriode > 0 ? ((realPeriode / targetPeriode) * 100).toFixed(1) : '0';
+    const roProgress = roPeriode > 0 ? ((realPeriode / roPeriode) * 100).toFixed(2) : '0.00';
+    const targetProgress = targetPeriode > 0 ? ((realPeriode / targetPeriode) * 100).toFixed(2) : '0.00';
+
+    let roProgressColor = 'var(--danger)';
+    const roProgressNum = parseFloat(roProgress);
+    if (roProgressNum >= 100) {
+      roProgressColor = 'var(--primary)';
+    } else if (roProgressNum >= 80) {
+      roProgressColor = 'var(--warning)';
+    }
 
     // Kehadiran Hari ini (15 Juli 2026)
     const activePndIds = [...new Set(targetPndOfMdr.map(tp => tp.penyadap_id))];
@@ -868,7 +881,7 @@ const DashboardModule = (() => {
         <div class="card metric-card">
           <div class="metric-header"><span class="metric-title">PRODUKSI S.D HARI INI</span><span class="metric-icon">📈</span></div>
           <div>
-            <div class="metric-value">${realTahun.toLocaleString('id-ID')} <span style="font-size:1rem;color:var(--text-secondary);">kg</span> <span style="font-size:.85rem;font-weight:600;color:${sumTargetTahun>0?(realTahun/sumTargetTahun>=1?'var(--primary)':realTahun/sumTargetTahun>=0.8?'var(--warning)':'var(--danger)'):'var(--text-secondary)'};"> (${sumTargetTahun>0?((realTahun/sumTargetTahun)*100).toFixed(1):0}%)</span></div>
+            <div class="metric-value">${realTahun.toLocaleString('id-ID')} <span style="font-size:1rem;color:var(--text-secondary);">kg</span> <span style="font-size:.85rem;font-weight:600;color:${sumTargetTahun>0?(realTahun/sumTargetTahun>=1?'var(--primary)':realTahun/sumTargetTahun>=0.8?'var(--warning)':'var(--danger)'):'var(--text-secondary)'};"> (${sumTargetTahun>0?((realTahun/sumTargetTahun)*100).toFixed(2) : '0.00'}%)</span></div>
             <div class="metric-footer">Dari Awal Tahun ${t}</div>
           </div>
         </div>
@@ -876,7 +889,7 @@ const DashboardModule = (() => {
         <div class="card metric-card">
           <div class="metric-header"><span class="metric-title">RENCANA OPERASIONAL (RO)</span><span class="metric-icon">📋</span></div>
           <div>
-            <div class="metric-value">${roPeriode.toLocaleString('id-ID')} <span style="font-size:1rem;color:var(--text-secondary);">kg</span> <span style="font-size:.85rem;font-weight:600;color:${sumTargetTahun>0?(roPeriode/sumTargetTahun>=1?'var(--primary)':roPeriode/sumTargetTahun>=0.8?'var(--warning)':'var(--danger)'):'var(--text-secondary)'};"> (${sumTargetTahun>0?((roPeriode/sumTargetTahun)*100).toFixed(1):0}%)</span></div>
+            <div class="metric-value">${roPeriode.toLocaleString('id-ID')} <span style="font-size:1rem;color:var(--text-secondary);">kg</span> <span style="font-size:.85rem;font-weight:600;color:${sumTargetTahun>0?(roPeriode/sumTargetTahun>=1?'var(--primary)':roPeriode/sumTargetTahun>=0.8?'var(--warning)':'var(--danger)'):'var(--text-secondary)'};"> (${sumTargetTahun>0?((roPeriode/sumTargetTahun)*100).toFixed(2) : '0.00'}%)</span></div>
             <div class="metric-footer">Periode ${p} Bulan ${b}</div>
           </div>
         </div>
@@ -884,7 +897,7 @@ const DashboardModule = (() => {
         <div class="card metric-card">
           <div class="metric-header"><span class="metric-title">REALISASI PERIODE</span><span class="metric-icon">🛢️</span></div>
           <div>
-            <div class="metric-value">${realPeriode.toLocaleString('id-ID')} <span style="font-size:1rem;color:var(--text-secondary);">kg</span> <span style="font-size:.85rem;font-weight:600;color:${sumTargetTahun>0?(realPeriode/sumTargetTahun>=1?'var(--primary)':realPeriode/sumTargetTahun>=0.8?'var(--warning)':'var(--danger)'):'var(--text-secondary)'};"> (${sumTargetTahun>0?((realPeriode/sumTargetTahun)*100).toFixed(1):0}%)</span></div>
+            <div class="metric-value">${realPeriode.toLocaleString('id-ID')} <span style="font-size:1rem;color:var(--text-secondary);">kg</span> <span style="font-size:.85rem;font-weight:600;color:${sumTargetTahun>0?(realPeriode/sumTargetTahun>=1?'var(--primary)':realPeriode/sumTargetTahun>=0.8?'var(--warning)':'var(--danger)'):'var(--text-secondary)'};"> (${sumTargetTahun>0?((realPeriode/sumTargetTahun)*100).toFixed(2) : '0.00'}%)</span></div>
             <div class="metric-footer">Hari ini: ${realHariIni.toLocaleString('id-ID')} kg</div>
           </div>
         </div>
@@ -952,14 +965,14 @@ const DashboardModule = (() => {
 
         <!-- Card Progres Periode (Radial Chart Visual) -->
         <div class="card" style="padding:1rem;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-          <h4 style="margin-bottom:.5rem;font-size:.9rem;color:var(--text-secondary);align-self:flex-start;">📈 PROGRESS PERIODE</h4>
-          <div style="position:relative;width:80px;height:80px;border-radius:50%;background:conic-gradient(var(--primary) ${targetProgress}%, var(--bg-surface-elevated) 0);display:flex;align-items:center;justify-content:center;margin:auto;">
+          <h4 style="margin-bottom:.5rem;font-size:.9rem;color:var(--text-secondary);align-self:flex-start;">📈 PROGRESS RO PERIODE</h4>
+          <div style="position:relative;width:80px;height:80px;border-radius:50%;background:conic-gradient(${roProgressColor} ${roProgress}%, var(--bg-surface-elevated) 0);display:flex;align-items:center;justify-content:center;margin:auto;">
             <div style="width:65px;height:65px;border-radius:50%;background:var(--card-bg);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;color:var(--text-primary);">
-              ${targetProgress}%
+              ${roProgress}%
             </div>
           </div>
           <div style="font-size:.75rem;color:var(--text-secondary);text-align:center;margin-top:.5rem;">
-            ${realPeriode.toLocaleString('id-ID')} / ${targetPeriode.toLocaleString('id-ID')} Kg
+            ${realPeriode.toLocaleString('id-ID')} / ${roPeriode.toLocaleString('id-ID')} Kg
           </div>
         </div>
       </div>
@@ -1007,19 +1020,19 @@ const DashboardModule = (() => {
           .filter(rl => rl.penyadap_id === targ.penyadap_id && new Date(rl.tanggal).getFullYear() === t)
           .reduce((sum, rl) => sum + (rl.berat_bersih || 0), 0);
         totProd += prodPenyadap;
-        const prodPct = tgtTahun > 0 ? ((prodPenyadap / tgtTahun) * 100).toFixed(0) : '0';
+        const prodPct = tgtTahun > 0 ? ((prodPenyadap / tgtTahun) * 100).toFixed(2) : '0.00';
 
         // RO Periode ini
         const roPenyadapObj = roPeriodeList.find(ro => ro.penyadap_id === targ.penyadap_id && ro.areal_id === targ.anak_petak_id);
         const roPenyadap = roPenyadapObj ? roPenyadapObj.kesanggupan : 0;
         totRo += roPenyadap;
-        const roPct = tgtTahun > 0 ? ((roPenyadap / (tgtTahun/12)) * 100).toFixed(0) : '0';
 
         // Realisasi Periode ini
         const realPenyadap = realPeriodeList
           .filter(rl => rl.penyadap_id === targ.penyadap_id)
           .reduce((sum, rl) => sum + (rl.berat_bersih || 0), 0);
         totReal += realPenyadap;
+        const realRoPct = roPenyadap > 0 ? ((realPenyadap / roPenyadap) * 100).toFixed(2) : '0.00';
 
         // Keterangan: jika sudah setor → tanggal setor
         // jika belum setor → tampilkan "Belum Setor — [Alasan Kehadiran]"
@@ -1080,16 +1093,18 @@ const DashboardModule = (() => {
             </td>
             <td>
               <strong>${roPenyadap.toLocaleString('id-ID')} Kg</strong>
-              <div class="text-muted-sm">${roPct}%</div>
             </td>
-            <td><strong>${realPenyadap > 0 ? realPenyadap.toLocaleString('id-ID') + ' Kg' : '—'}</strong></td>
+            <td>
+              <strong>${realPenyadap.toLocaleString('id-ID')} Kg</strong>
+              <div class="text-muted-sm">${realRoPct}%</div>
+            </td>
             <td><span class="badge ${ketBadge}">${ket}</span></td>
           </tr>
         `;
       }).join('');
 
-      const totProdPct = totTargetTahun > 0 ? ((totProd / totTargetTahun) * 100).toFixed(1) : '0';
-      const totRoPct = totTargetTahun > 0 ? ((totRo / (totTargetTahun/12)) * 100).toFixed(1) : '0';
+      const totProdPct = totTargetTahun > 0 ? ((totProd / totTargetTahun) * 100).toFixed(2) : '0.00';
+      const totRealRoPct = totRo > 0 ? ((totReal / totRo) * 100).toFixed(2) : '0.00';
 
       petakHtml += `
         <div style="margin-bottom:2rem;">
@@ -1099,8 +1114,8 @@ const DashboardModule = (() => {
             <div style="display:flex;gap:1.5rem;font-size:.8rem;">
               <div>TARGET PETAK: <strong>${totTargetTahun.toLocaleString('id-ID')} Kg</strong></div>
               <div>PRODUKSI: <strong>${totProd.toLocaleString('id-ID')} Kg (${totProdPct}%)</strong></div>
-              <div>RO: <strong>${totRo.toLocaleString('id-ID')} Kg (${totRoPct}%)</strong></div>
-              <div>REALISASI: <strong>${totReal.toLocaleString('id-ID')} Kg</strong></div>
+              <div>RO: <strong>${totRo.toLocaleString('id-ID')} Kg</strong></div>
+              <div>REALISASI: <strong>${totReal.toLocaleString('id-ID')} Kg (${totRealRoPct}%)</strong></div>
             </div>
           </div>
           
@@ -1131,9 +1146,11 @@ const DashboardModule = (() => {
                     </td>
                     <td>
                       ${totRo.toLocaleString('id-ID')} Kg
-                      <div class="text-muted-sm" style="font-weight:normal;">${totRoPct}%</div>
                     </td>
-                    <td>${totReal.toLocaleString('id-ID')} Kg</td>
+                    <td>
+                      ${totReal.toLocaleString('id-ID')} Kg
+                      <div class="text-muted-sm" style="font-weight:normal;">${totRealRoPct}%</div>
+                    </td>
                     <td>—</td>
                   </tr>
                 </tbody>

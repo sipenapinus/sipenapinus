@@ -21,6 +21,16 @@ const LaporanModule = (() => {
     if (elAwal) elAwal.value = today.substring(0, 8) + '01'; // awal bulan
     if (elAkhir) elAkhir.value = today;
 
+    // Set default bulan dan periode berdasarkan hari ini
+    const todayDate = new Date();
+    const currentMonth = todayDate.getMonth() + 1;
+    const currentPeriod = todayDate.getDate() <= 15 ? 1 : 2;
+
+    const elBulan = document.getElementById('rpt-bulan');
+    const elPeriode = document.getElementById('rpt-periode');
+    if (elBulan) elBulan.value = currentMonth;
+    if (elPeriode) elPeriode.value = currentPeriod;
+
     // Set Kop Surat dinamis berdasarkan wilayah kerja user saat ini
     updateKopLabels();
 

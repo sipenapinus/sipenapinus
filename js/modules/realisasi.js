@@ -221,7 +221,7 @@ const RealisasiModule = (() => {
       let pctColor = 'var(--text-secondary)';
       if (targetRO > 0) {
         const pct = (real / targetRO) * 100;
-        pctText = pct.toFixed(1) + '%';
+        pctText = pct.toFixed(2) + '%';
         if (pct >= 100) {
           pctColor = 'var(--primary)'; // Green / Sukses
         } else if (pct >= 80) {
@@ -514,7 +514,7 @@ const RealisasiModule = (() => {
       const tpg = allTpg.find(t => t.id === r.tpg_id);
       const targetRO = findROKesanggupan(r, allRO);
       const real = r.berat_bersih || 0;
-      const pct = targetRO > 0 ? ((real / targetRO) * 100).toFixed(1) + '%' : '-';
+      const pct = targetRO > 0 ? ((real / targetRO) * 100).toFixed(2) + '%' : '-';
       
       return {
         'Tanggal Setor':     r.tanggal || '',
