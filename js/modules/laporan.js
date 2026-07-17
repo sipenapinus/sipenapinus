@@ -186,14 +186,19 @@ const LaporanModule = (() => {
     const elTitle = document.getElementById('rpt-title');
     const elSub = document.getElementById('rpt-subtitle');
     const elTpgRow = document.getElementById('rpt-tpg-row');
+    const kopSurat = document.querySelector('.kop-surat');
+    const logoMini = document.getElementById('rpt-logo-mini');
 
     if (jenis === 'pantauan') {
+      if (kopSurat) kopSurat.style.display = 'none';
+      if (logoMini) logoMini.style.display = 'block';
+
       const prdRoman = prd === 1 ? 'I' : 'II';
       const blnNames = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI','JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER'];
       const periodLabel = `${prdRoman} ${blnNames[bln-1]} 2026`;
 
       if (elTitle) {
-        elTitle.innerHTML = `PANTAUAN KEGIATAN SADAPAN ${rph ? 'RPH ' + rph.nama.toUpperCase() : ''} BKPH BANTARKAWUNG<br><span style="font-size:1rem;">KESATUAN PEMANGKUAN HUTAN KPH PEKALONGAN BARAT</span>`;
+        elTitle.innerHTML = `PANTAUAN KEGIATAN SADAPAN ${rph ? 'RPH ' + rph.nama.toUpperCase() : ''} BKPH BANTARKAWUNG<br><span style="font-size:1rem;">KESATUAN PEMANGKUAN HUTAN PEKALONGAN BARAT</span>`;
       }
       if (elTpgRow) {
         elTpgRow.style.display = 'block';
@@ -206,6 +211,9 @@ const LaporanModule = (() => {
         elSub.textContent = `PERIODE : ${periodLabel}`;
       }
     } else {
+      if (kopSurat) kopSurat.style.display = 'flex';
+      if (logoMini) logoMini.style.display = 'none';
+
       if (elTitle) {
         elTitle.textContent = jenis === 'realisasi'
           ? 'LAPORAN REALISASI PRODUKSI GETAH'

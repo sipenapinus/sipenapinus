@@ -242,17 +242,22 @@ class SipenaApp {
       const tab = link.getAttribute('data-section');
       let visible = true;
 
+      // Menyembunyikan menu Pengaturan dari pengguna non-admin
+      if (role !== 'admin' && tab === 'pengaturan') {
+        visible = false;
+      }
+
       if (role === 'bkph') {
-        // Asper: Dashboard, Target & RO, Realisasi (view-only), Pengaturan (No Data Master)
+        // Asper: Dashboard, Target & RO, Realisasi (view-only)
         if (tab === 'master') visible = false;
       } else if (role === 'krph') {
-        // KRPH: Dashboard, Target & RO, Realisasi (view-only), Pengaturan (No Data Master)
+        // KRPH: Dashboard, Target & RO, Realisasi (view-only)
         if (tab === 'master') visible = false;
       } else if (role === 'tpg') {
-        // Mandor TPG: Dashboard + Realisasi Produksi (write) + Target & RO + Data Master + Pengaturan
+        // Mandor TPG: Dashboard + Realisasi Produksi (write) + Target & RO + Data Master
         defaultTab = 'dashboard';
       } else if (role === 'mandor') {
-        // Mandor Sadap: Dashboard + Target & RO + Realisasi (view-only) + Data Master + Pengaturan
+        // Mandor Sadap: Dashboard + Target & RO + Realisasi (view-only) + Data Master
         defaultTab = 'dashboard';
       }
 
