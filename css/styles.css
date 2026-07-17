@@ -719,9 +719,9 @@ code {
   background-color: var(--bg-surface) !important;
   color: var(--text-primary) !important;
 }
-.print-container .kop-surat h3, 
-.print-container .kop-surat h4, 
-.print-container .kop-surat h5, 
+.print-container .kop-surat h3,
+.print-container .kop-surat h4,
+.print-container .kop-surat h5,
 .print-container .kop-surat p,
 .print-container #rpt-title,
 .print-container #rpt-subtitle,
@@ -737,11 +737,25 @@ code {
   fill: var(--primary) !important;
 }
 
+/* ── Landscape print class (applied by JS for pantauan) ─────── */
+.print-landscape {
+  page: landscape-page;
+}
+
+@page landscape-page {
+  size: 330mm 215mm; /* F4 Landscape: 330mm x 215mm */
+  margin: 8mm 10mm;
+}
+@page {
+  size: 215mm 330mm; /* F4 Portrait default */
+  margin: 15mm;
+}
+
 @media print {
   body, html {
     background: #fff !important;
     color: #000 !important;
-    font-size: 11pt !important;
+    font-size: 9pt !important;
     height: auto !important;
   }
   .app-sidebar,
@@ -778,12 +792,13 @@ code {
     background: #fff !important;
     color: #000 !important;
   }
-  .print-container .kop-surat h3, 
-  .print-container .kop-surat h4, 
-  .print-container .kop-surat h5, 
+  .print-container .kop-surat h3,
+  .print-container .kop-surat h4,
+  .print-container .kop-surat h5,
   .print-container .kop-surat p,
   .print-container #rpt-title,
   .print-container #rpt-subtitle,
+  .print-container #rpt-tpg-row,
   .print-container #rpt-table-body,
   .print-container .report-table td,
   .print-container div p {
@@ -795,21 +810,41 @@ code {
   .print-container svg rect {
     fill: #1b4d3e !important;
   }
+  /* Table container: remove overflow clip for print */
+  .table-container {
+    overflow: visible !important;
+  }
   /* Table styling for report */
   .report-table {
     width: 100% !important;
     border-collapse: collapse !important;
-    margin-top: 10px !important;
+    margin-top: 8px !important;
+    table-layout: fixed !important;
   }
   .report-table th, .report-table td {
-    border: 1px solid #000 !important;
-    padding: 6px 8px !important;
+    border: 1px solid #333 !important;
+    padding: 3px 3px !important;
     color: #000 !important;
+    font-size: 6.5pt !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
   }
   .report-table th {
-    background: #f2f2f2 !important;
+    background: #c8e6c9 !important;
     color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 6pt !important;
+    vertical-align: middle !important;
+    text-align: center !important;
+    font-weight: 700 !important;
+  }
+  /* Footer total row */
+  .report-table tr.total-row td {
+    background: #a5d6a7 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 }
+
+

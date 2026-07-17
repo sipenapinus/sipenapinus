@@ -193,11 +193,11 @@ const TargetModule = (() => {
     const t = state.tahun;
 
     // Load data
-    const bkphList = (await window.db.getAllActive('target_bkph')).filter(x => x.tahun === t);
-    const rphList  = (await window.db.getAllActive('target_rph')).filter(x => x.tahun === t);
-    const tpgList  = (await window.db.getAllActive('target_tpg')).filter(x => x.tahun === t);
-    const mdrList  = (await window.db.getAllActive('target_mandor')).filter(x => x.tahun === t);
-    const pndList  = (await window.db.getAllActive('target_penyadap')).filter(x => x.tahun === t);
+    const bkphList = (await window.db.getAllActive('target_bkph')).filter(x => parseInt(x.tahun) === parseInt(t));
+    const rphList  = (await window.db.getAllActive('target_rph')).filter(x => parseInt(x.tahun) === parseInt(t));
+    const tpgList  = (await window.db.getAllActive('target_tpg')).filter(x => parseInt(x.tahun) === parseInt(t));
+    const mdrList  = (await window.db.getAllActive('target_mandor')).filter(x => parseInt(x.tahun) === parseInt(t));
+    const pndList  = (await window.db.getAllActive('target_penyadap')).filter(x => parseInt(x.tahun) === parseInt(t));
 
     const sumBkph = bkphList.reduce((s, x) => s + (x.target_kg || 0), 0);
     const sumRph  = rphList.reduce((s, x) => s + (x.target_kg || 0), 0);
@@ -243,7 +243,7 @@ const TargetModule = (() => {
 
   // ── Render BKPH ──────────────────────────────────────────────
   async function renderBKPH() {
-    const list = (await window.db.getAllActive('target_bkph')).filter(x => x.tahun === state.tahun);
+    const list = (await window.db.getAllActive('target_bkph')).filter(x => parseInt(x.tahun) === parseInt(state.tahun));
     const tbody = document.getElementById('target-tbody');
     const thead = document.getElementById('target-thead');
     if (!tbody || !thead) return;
@@ -279,7 +279,7 @@ const TargetModule = (() => {
 
   // ── Render RPH ──────────────────────────────────────────────
   async function renderRPH() {
-    const list    = (await window.db.getAllActive('target_rph')).filter(x => x.tahun === state.tahun);
+    const list    = (await window.db.getAllActive('target_rph')).filter(x => parseInt(x.tahun) === parseInt(state.tahun));
     const allRph  = await window.db.getAllActive('rph');
     const tbody   = document.getElementById('target-tbody');
     const thead   = document.getElementById('target-thead');
@@ -326,7 +326,7 @@ const TargetModule = (() => {
 
   // ── Render TPG ──────────────────────────────────────────────
   async function renderTPG() {
-    const list    = (await window.db.getAllActive('target_tpg')).filter(x => x.tahun === state.tahun);
+    const list    = (await window.db.getAllActive('target_tpg')).filter(x => parseInt(x.tahun) === parseInt(state.tahun));
     const allTpg  = await window.db.getAllActive('tpg');
     const tbody   = document.getElementById('target-tbody');
     const thead   = document.getElementById('target-thead');
@@ -373,7 +373,7 @@ const TargetModule = (() => {
 
   // ── Render Mandor ───────────────────────────────────────────
   async function renderMandor() {
-    const list     = (await window.db.getAllActive('target_mandor')).filter(x => x.tahun === state.tahun);
+    const list     = (await window.db.getAllActive('target_mandor')).filter(x => parseInt(x.tahun) === parseInt(state.tahun));
     const allUsers = await window.db.getAllActive('users');
     const tbody    = document.getElementById('target-tbody');
     const thead    = document.getElementById('target-thead');
@@ -425,7 +425,7 @@ const TargetModule = (() => {
     const thead = document.getElementById('target-thead');
     if (!tbody || !thead) return;
 
-    thead.innerHTML = `<tr><th style="width:50px">No</th><th>Penyadap</th><th>Petak</th><th>Luas (Ha)</th><th>Pohon (Sadap)</th><th>Target Petak (Kg)</th><th>Target Penyadap (Kg)</th></tr>`;
+    thead.innerHTML = `<tr><th style="width:50px">No</th><th>Petak / Penyadap</th><th>Luas (Ha)</th><th>Pohon (Sadap)</th><th>Target Petak (Kg)</th><th>Target Penyadap (Kg)</th></tr>`;
 
     const user = window.app.currentUser;
     const role = user ? user.role : '';
@@ -435,68 +435,82 @@ const TargetModule = (() => {
     const allAP = await window.db.getAllActive('anak_petak');
     const allPetak = await window.db.getAllActive('petak');
     const allPgn = await window.db.getAllActive('penugasan');
-    const targetList = (await window.db.getAllActive('target_penyadap')).filter(x => x.tahun === state.tahun);
-    const apTargetList = (await window.db.getAllActive('target_anak_petak')).filter(x => x.tahun === state.tahun);
+    const targetList = (await window.db.getAllActive('target_penyadap')).filter(x => parseInt(x.tahun) === parseInt(state.tahun));
+    const apTargetList = (await window.db.getAllActive('target_anak_petak')).filter(x => parseInt(x.tahun) === parseInt(state.tahun));
 
     const activePenugasan = allPgn.filter(pg => pg.aktif === 1);
     
-    let assignedPgn = activePenugasan;
+    // Filter petaks that belong to this Mandor or TPG
+    let relevantPetaks = allPetak;
     if (perm.isMandor && scope) {
       if (role === 'mandor') {
-        assignedPgn = activePenugasan.filter(pg => {
-          const ap = allAP.find(a => a.id === pg.anak_petak_id);
-          const petak = ap ? allPetak.find(p => p.id === ap.petak_id) : null;
-          return petak && petak.mandor_id === user.id;
-        });
+        relevantPetaks = allPetak.filter(p => p.mandor_id === user.id);
       } else {
-        const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
-        assignedPgn = activePenugasan.filter(pg => apIds.includes(pg.anak_petak_id));
+        relevantPetaks = allPetak.filter(p => p.tpg_id === scope);
       }
     }
 
     let displayRows = [];
-    assignedPgn.forEach(pg => {
-      const psy = allPenyadap.find(p => p.id === pg.penyadap_id);
-      const ap = allAP.find(a => a.id === pg.anak_petak_id);
-      const petak = ap ? allPetak.find(p => p.id === ap.petak_id) : null;
+    relevantPetaks.forEach(petak => {
+      // Find all anak petaks for this petak
+      const aps = allAP.filter(a => a.petak_id === petak.id);
+      const apIds = aps.map(a => a.id);
       
-      if (!psy || !ap) return;
+      // Find active penugasans for these anak petaks
+      const pgns = activePenugasan.filter(pg => apIds.includes(pg.anak_petak_id));
       
-      const targetRecord = targetList.find(t => t.penyadap_id === pg.penyadap_id && t.anak_petak_id === pg.anak_petak_id);
-      const apTargetRecord = apTargetList.find(t => t.anak_petak_id === pg.anak_petak_id);
+      const tappers = [];
+      let totalPenyadapTarget = 0;
+      
+      pgns.forEach(pg => {
+        const psy = allPenyadap.find(p => p.id === pg.penyadap_id);
+        const ap = allAP.find(a => a.id === pg.anak_petak_id);
+        if (!psy || !ap) return;
+        
+        const targetRecord = targetList.find(t => t.penyadap_id === pg.penyadap_id && t.anak_petak_id === pg.anak_petak_id);
+        const targetVal = targetRecord ? (targetRecord.target_kg || 0) : 0;
+        totalPenyadapTarget += targetVal;
+        
+        tappers.push({
+          id: targetRecord ? targetRecord.id : `new-${pg.penyadap_id}-${pg.anak_petak_id}`,
+          penyadap_id: pg.penyadap_id,
+          anak_petak_id: pg.anak_petak_id,
+          psy,
+          ap,
+          luas_ha: targetRecord ? targetRecord.luas_ha : (ap.luas_ha || 0),
+          pohon: targetRecord ? targetRecord.pohon : (pg.jumlah_pohon || ap.jumlah_pohon || 0),
+          target_kg: targetVal
+        });
+      });
+
+      const apFirst = aps[0] || null;
+      const apTargetRecord = apFirst ? apTargetList.find(t => t.anak_petak_id === apFirst.id) : null;
       const targetPetakVal = apTargetRecord ? (apTargetRecord.target_kg || 0) : 0;
       
       displayRows.push({
-        id: targetRecord ? targetRecord.id : `new-${pg.penyadap_id}-${pg.anak_petak_id}`,
-        penyadap_id: pg.penyadap_id,
-        anak_petak_id: pg.anak_petak_id,
-        psy,
-        ap,
         petak,
         target_petak: targetPetakVal,
-        luas_ha: targetRecord ? targetRecord.luas_ha : (ap.luas_ha || 0),
-        pohon: targetRecord ? targetRecord.pohon : (pg.jumlah_pohon || ap.jumlah_pohon || 0),
-        target_kg: targetRecord ? (targetRecord.target_kg || 0) : 0
+        luas_ha: petak.luas_ha || (apFirst ? apFirst.luas_ha : 0),
+        pohon: petak.jumlah_pohon || (apFirst ? apFirst.jumlah_pohon : 0),
+        tappers,
+        total_penyadap_target: totalPenyadapTarget
       });
     });
 
     if (state.search) {
       const q = state.search.toLowerCase();
-      displayRows = displayRows.filter(r => r.psy.nama.toLowerCase().includes(q));
+      displayRows = displayRows.filter(r => r.petak.nomor.toLowerCase().includes(q) || r.tappers.some(t => t.psy.nama.toLowerCase().includes(q)));
     }
 
-    // Sort displayRows by custom petak order -> Penyadap name
+    // Sort displayRows by custom petak order
     displayRows.sort((a, b) => {
-      const petakLabelA = a.petak && a.ap ? `Petak ${a.petak.nomor}${a.ap.huruf}` : '';
-      const petakLabelB = b.petak && b.ap ? `Petak ${b.petak.nomor}${b.ap.huruf}` : '';
+      const petakLabelA = a.petak ? `Petak ${a.petak.nomor}` : '';
+      const petakLabelB = b.petak ? `Petak ${b.petak.nomor}` : '';
       
       const idxA = getCustomSortIndex(petakLabelA);
       const idxB = getCustomSortIndex(petakLabelB);
       if (idxA !== idxB) return idxA - idxB;
-      
-      const nameA = a.psy ? a.psy.nama : '';
-      const nameB = b.psy ? b.psy.nama : '';
-      return nameA.localeCompare(nameB);
+      return petakLabelA.localeCompare(petakLabelB, undefined, { numeric: true, sensitivity: 'base' });
     });
 
     // Quota Tracker calculation for Mandor / TPG
@@ -506,16 +520,17 @@ const TargetModule = (() => {
       let titleLabel = '';
       let allocatedVal = 0;
 
+      const apTargetList = (await window.db.getAllActive('target_anak_petak')).filter(x => parseInt(x.tahun) === parseInt(state.tahun));
+
       if (role === 'mandor') {
         titleLabel = 'Target Mandor Anda';
-        const allMandorTargets = await window.db.getAllActive('target_mandor');
-        const matching = allMandorTargets.find(t => t.tahun === state.tahun && t.mandor_id === user.id);
-        targetTpgVal = matching ? (matching.target_kg || 0) : 0;
-
         const myApIds = allAP.filter(ap => {
           const petak = allPetak.find(p => p.id === ap.petak_id);
           return petak && petak.mandor_id === user.id;
         }).map(ap => ap.id);
+
+        // Target Mandor didapatkan langsung dari akumulasi target petak (anak petak) pangkuannya
+        targetTpgVal = apTargetList.filter(t => myApIds.includes(t.anak_petak_id)).reduce((s, t) => s + (t.target_kg || 0), 0);
 
         allocatedVal = targetList
           .filter(t => myApIds.includes(t.anak_petak_id))
@@ -523,10 +538,16 @@ const TargetModule = (() => {
       } else {
         titleLabel = 'Target TPG Anda';
         const allTpgTargets = await window.db.getAllActive('target_tpg');
-        const matching = allTpgTargets.find(t => t.tahun === state.tahun && t.tpg_id === scope);
+        const matching = allTpgTargets.find(t => parseInt(t.tahun) === parseInt(state.tahun) && t.tpg_id === scope);
         targetTpgVal = matching ? (matching.target_kg || 0) : 0;
 
         const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
+
+        // FALLBACK: jika target TPG dari atasan belum di-input (0), gunakan akumulasi target petak (anak petak)
+        if (targetTpgVal === 0) {
+          targetTpgVal = apTargetList.filter(t => apIds.includes(t.anak_petak_id)).reduce((s, t) => s + (t.target_kg || 0), 0);
+        }
+
         allocatedVal = targetList
           .filter(t => apIds.includes(t.anak_petak_id))
           .reduce((sum, t) => sum + (t.target_kg || 0), 0);
@@ -568,45 +589,104 @@ const TargetModule = (() => {
     trackerContainer.innerHTML = trackerHtml;
 
     if (displayRows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Tidak ada penyadap aktif di penugasan</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Tidak ada petak binaan yang ditemukan</td></tr>`;
       U().renderPagination(document.getElementById('target-pagination'), { total: 0, page: 1, totalPages: 1 }, null);
       return;
     }
 
-    tbody.innerHTML = displayRows.map((row, idx) => {
-      const label = row.petak && row.ap ? `Petak ${row.petak.nomor}${row.ap.huruf}` : '—';
-      const inputEl = perm.write ? `
-        <input type="number" class="form-control target-input-val" style="width:120px;display:inline-block;margin:0;"
-          data-id="${row.id}"
-          data-pnd="${row.penyadap_id}"
-          data-ap="${row.anak_petak_id}"
-          data-luas="${row.luas_ha}"
-          data-pohon="${row.pohon}"
-          value="${row.target_kg || ''}"
-          placeholder="0"
-          oninput="TargetModule.updateInlineTotal(${targetTpgVal})">
-      ` : `<strong>${(row.target_kg || 0).toLocaleString('id-ID')} kg</strong>`;
+    let rowIdx = 1;
+    tbody.innerHTML = displayRows.map(group => {
+      const petak = group.petak;
+      const petakLabel = `Petak ${petak.nomor}`;
+      const hasTappers = group.tappers.length > 0;
+      
+      let petakNameHtml = '';
+      if (hasTappers) {
+        petakNameHtml = `
+          <span style="cursor:pointer;font-weight:bold;color:var(--primary);user-select:none;" onclick="TargetModule.togglePetakRow('${petak.id}')">
+            <span id="expand-icon-${petak.id}" style="margin-right:0.4rem;font-size:0.75rem;display:inline-block;transition:transform 0.2s;">▶</span>
+            ${petakLabel}
+          </span>
+          <span class="badge badge-success" style="font-size:0.68rem;margin-left:0.5rem;padding:0.15rem 0.35rem;">${group.tappers.length} Penyadap</span>
+        `;
+      } else {
+        petakNameHtml = `
+          <span style="color:var(--text-secondary);font-weight:bold;">
+            <span style="margin-right:0.4rem;font-size:0.75rem;visibility:hidden;">▶</span>
+            ${petakLabel}
+          </span>
+          <span class="badge badge-inactive" style="font-size:0.68rem;margin-left:0.5rem;padding:0.15rem 0.35rem;background:rgba(255,255,255,0.05);color:var(--text-secondary);">Belum ditugaskan</span>
+        `;
+      }
 
-      return `
-        <tr>
-          <td>${idx + 1}</td>
-          <td>
-            <strong>${row.psy.nama}</strong>
-            <div class="text-muted-sm">${row.psy.nomor}</div>
-          </td>
-          <td>${label}</td>
-          <td>${row.luas_ha || 0} ha</td>
-          <td>${(row.pohon || 0).toLocaleString('id-ID')} pohon</td>
-          <td><strong>${(row.target_petak || 0).toLocaleString('id-ID')} kg</strong></td>
-          <td>${inputEl}</td>
+      const allocatedPenyadapHtml = hasTappers 
+        ? `<span id="petak-allocated-sum-${petak.id}"><strong>${group.total_penyadap_target.toLocaleString('id-ID')} kg</strong></span>`
+        : '—';
+
+      // 1. Render the main Petak Row
+      let html = `
+        <tr style="background:rgba(255,255,255,0.015);border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td>${rowIdx++}</td>
+          <td>${petakNameHtml}</td>
+          <td>${group.luas_ha || 0} ha</td>
+          <td>${(group.pohon || 0).toLocaleString('id-ID')} pohon</td>
+          <td><strong>${(group.target_petak || 0).toLocaleString('id-ID')} kg</strong></td>
+          <td>${allocatedPenyadapHtml}</td>
         </tr>
       `;
+
+      // 2. Render sub-rows for each Penyadap if assigned
+      if (hasTappers) {
+        group.tappers.forEach(tap => {
+          const inputEl = perm.write ? `
+            <input type="number" class="form-control target-input-val petak-input-${petak.id}" style="width:120px;display:inline-block;margin:0;"
+              data-id="${tap.id}"
+              data-pnd="${tap.penyadap_id}"
+              data-ap="${tap.anak_petak_id}"
+              data-luas="${tap.luas_ha}"
+              data-pohon="${tap.pohon}"
+              value="${tap.target_kg || ''}"
+              placeholder="0"
+              oninput="TargetModule.updateInlineTotal('${petak.id}', ${targetTpgVal})">
+          ` : `<strong>${(tap.target_kg || 0).toLocaleString('id-ID')} kg</strong>`;
+
+          html += `
+            <tr class="petak-child-${petak.id}" style="display:none;background:rgba(255,255,255,0.003);border-bottom:1px dashed rgba(255,255,255,0.03);">
+              <td></td>
+              <td style="padding-left:1.75rem;">
+                <span style="color:var(--text-secondary);font-size:0.88rem;">└─ 👤 <strong>${tap.psy.nama}</strong> <span style="font-size:0.8rem;color:var(--text-secondary);margin-left:0.3rem;">(${tap.psy.nomor})</span></span>
+              </td>
+              <td style="color:var(--text-secondary);font-size:0.88rem;">${tap.luas_ha} ha</td>
+              <td style="color:var(--text-secondary);font-size:0.88rem;">${(tap.pohon || 0).toLocaleString('id-ID')} pohon</td>
+              <td style="color:var(--text-secondary);font-size:0.88rem;">—</td>
+              <td>${inputEl}</td>
+            </tr>
+          `;
+        });
+      }
+
+      return html;
     }).join('');
 
-    const currentSum = displayRows.reduce((sum, r) => sum + r.target_kg, 0);
+    // Grand Totals
+    let sumLuas = 0;
+    let sumPohon = 0;
+    let sumTargetPetak = 0;
+    let currentSum = 0;
+
+    displayRows.forEach(g => {
+      sumLuas += (g.luas_ha || 0);
+      sumPohon += (g.pohon || 0);
+      sumTargetPetak += (g.target_petak || 0);
+      currentSum += (g.total_penyadap_target || 0);
+    });
+
     const sumHtml = `
-      <tr style="background:rgba(255,255,255,.02);font-weight:bold;">
-        <td colspan="6" style="text-align:right;padding-right:1rem;">TOTAL TARGET ALOKASI:</td>
+      <tr style="background:rgba(255,255,255,.02);font-weight:bold;border-top:2px solid var(--border-color);">
+        <td colspan="2" style="text-align:right;padding-right:1rem;">TOTAL:</td>
+        <td>${sumLuas.toFixed(2)} ha</td>
+        <td>${sumPohon.toLocaleString('id-ID')} pohon</td>
+        <td>${sumTargetPetak.toLocaleString('id-ID')} kg</td>
         <td><span id="inline-allocated-total">${currentSum.toLocaleString('id-ID')}</span> kg</td>
       </tr>
     `;
@@ -1408,7 +1488,31 @@ const TargetModule = (() => {
     }
   }
 
-  function updateInlineTotal(targetTpgVal = 0) {
+  function togglePetakRow(petakId) {
+    const subrows = document.querySelectorAll(`.petak-child-${petakId}`);
+    const icon = document.getElementById(`expand-icon-${petakId}`);
+    if (!subrows) return;
+    subrows.forEach(r => {
+      r.style.display = r.style.display === 'none' ? 'table-row' : 'none';
+    });
+    if (icon) {
+      icon.style.transform = icon.style.transform === 'rotate(90deg)' ? 'rotate(0deg)' : 'rotate(90deg)';
+    }
+  }
+
+  function updateInlineTotal(petakId, targetTpgVal = 0) {
+    if (petakId) {
+      const petakInputs = document.querySelectorAll(`.petak-input-${petakId}`);
+      let petakSum = 0;
+      petakInputs.forEach(input => {
+        petakSum += parseFloat(input.value) || 0;
+      });
+      const petakSumEl = document.getElementById(`petak-allocated-sum-${petakId}`);
+      if (petakSumEl) {
+        petakSumEl.innerHTML = petakSum > 0 ? `<strong>${petakSum.toLocaleString('id-ID')} kg</strong>` : '0 kg';
+      }
+    }
+
     const inputs = document.querySelectorAll('.target-input-val');
     let sum = 0;
     inputs.forEach(input => {
@@ -1438,7 +1542,85 @@ const TargetModule = (() => {
   }
 
   async function saveAllPenyadap() {
+    const perm = getPermissions();
+    const user = window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : null;
+
+    const allAP = await window.db.getAllActive('anak_petak');
+    const allPetak = await window.db.getAllActive('petak');
+    const apTargetList = (await window.db.getAllActive('target_anak_petak')).filter(x => x.tahun === state.tahun);
+
+    // 1. Get Mandor/TPG Quota Limit
+    let targetTpgVal = 0;
+    if (perm.isMandor && scope) {
+      if (role === 'mandor') {
+        const allMandorTargets = await window.db.getAllActive('target_mandor');
+        const matching = allMandorTargets.find(t => t.tahun === state.tahun && t.mandor_id === user.id);
+        targetTpgVal = matching ? (matching.target_kg || 0) : 0;
+      } else {
+        const allTpgTargets = await window.db.getAllActive('target_tpg');
+        const matching = allTpgTargets.find(t => t.tahun === state.tahun && t.tpg_id === scope);
+        targetTpgVal = matching ? (matching.target_kg || 0) : 0;
+      }
+    }
+
     const inputs = document.querySelectorAll('.target-input-val');
+    let grandSum = 0;
+    inputs.forEach(input => {
+      grandSum += parseFloat(input.value) || 0;
+    });
+
+    // Validation: Exceeding overall quota limit
+    if (role === 'mandor' && targetTpgVal > 0 && grandSum > targetTpgVal) {
+      U().showToast(`Gagal: Total alokasi target penyadap (${grandSum.toLocaleString('id-ID')} kg) melebihi Kuota Target Mandor Anda (${targetTpgVal.toLocaleString('id-ID')} kg)!`, 'danger');
+      return;
+    }
+
+    // 2. Validate petak-level targets
+    let relevantPetaks = allPetak;
+    if (perm.isMandor && scope) {
+      if (role === 'mandor') {
+        relevantPetaks = allPetak.filter(p => p.mandor_id === user.id);
+      } else {
+        relevantPetaks = allPetak.filter(p => p.tpg_id === scope);
+      }
+    }
+
+    let exceedMessage = '';
+    let shortWarningMessage = '';
+
+    relevantPetaks.forEach(petak => {
+      const aps = allAP.filter(a => a.petak_id === petak.id);
+      const apFirst = aps[0] || null;
+      const apTargetRecord = apFirst ? apTargetList.find(t => t.anak_petak_id === apFirst.id) : null;
+      const targetPetakVal = apTargetRecord ? (apTargetRecord.target_kg || 0) : 0;
+
+      // Sum all tapper inputs for this petak
+      const petakInputs = document.querySelectorAll(`.petak-input-${petak.id}`);
+      let petakSum = 0;
+      petakInputs.forEach(input => {
+        petakSum += parseFloat(input.value) || 0;
+      });
+
+      if (petakSum > targetPetakVal) {
+        exceedMessage += `• Petak ${petak.nomor}: Input ${petakSum.toLocaleString('id-ID')} kg (Target Petak: ${targetPetakVal.toLocaleString('id-ID')} kg)\n`;
+      } else if (petakSum < targetPetakVal && petakSum > 0) {
+        shortWarningMessage += `• Petak ${petak.nomor}: Input ${petakSum.toLocaleString('id-ID')} kg (Target Petak: ${targetPetakVal.toLocaleString('id-ID')} kg)\n`;
+      }
+    });
+
+    if (exceedMessage) {
+      U().showToast(`Gagal menyimpan! Alokasi target melebihi target petak yang ditetapkan Admin.`, 'danger');
+      alert(`Gagal menyimpan!\n\nAlokasi target penyadap melebihi target petak yang ditetapkan Admin:\n\n${exceedMessage}`);
+      return;
+    }
+
+    if (shortWarningMessage) {
+      const confirmSave = confirm(`Peringatan:\n\nAlokasi target penyadap masih kurang dari target petak pada beberapa petak berikut:\n\n${shortWarningMessage}\nApakah Anda yakin ingin tetap menyimpan?`);
+      if (!confirmSave) return;
+    }
+
     const actor = U().currentActorId();
     const records = [];
 
@@ -1501,6 +1683,7 @@ const TargetModule = (() => {
     handleTemplateClick,
     handleImportClick,
     updateInlineTotal,
+    togglePetakRow,
     saveAllPenyadap,
 
     // RO exports

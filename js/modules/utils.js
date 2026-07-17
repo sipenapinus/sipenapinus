@@ -236,12 +236,78 @@ function hideImportErrors(panelId) {
 // ─────────────────────────────────────────────────────────────
 function openModal(id) {
   const el = document.getElementById(id);
-  if (el) el.classList.add('active');
+  if (el) {
+    el.classList.add('active');
+    makeDraggable(id);
+  }
 }
 
 function closeModal(id) {
   const el = document.getElementById(id);
-  if (el) el.classList.remove('active');
+  if (el) {
+    el.classList.remove('active');
+    const content = el.querySelector('.modal-content');
+    if (content) {
+      // Reset drag position style on close so it centers next time
+      content.style.position = '';
+      content.style.left = '';
+      content.style.top = '';
+      content.style.transform = '';
+      content.style.margin = '';
+    }
+  }
+}
+
+function makeDraggable(id) {
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  const content = modal.querySelector('.modal-content');
+  const header = modal.querySelector('.modal-header');
+  if (!content || !header) return;
+
+  header.style.cursor = 'move';
+  header.style.userSelect = 'none';
+
+  let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+
+  header.onmousedown = dragMouseDown;
+
+  function dragMouseDown(e) {
+    e = e || window.event;
+    if (e.target.classList.contains('modal-close') || e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    
+    // Convert to absolute coordinates on first drag
+    if (content.style.position !== 'absolute') {
+      const rect = content.getBoundingClientRect();
+      content.style.position = 'absolute';
+      content.style.left = rect.left + 'px';
+      content.style.top = rect.top + 'px';
+      content.style.transform = 'none';
+      content.style.margin = '0';
+    }
+
+    pos3 = e.clientX;
+    pos4 = e.clientY;
+    document.onmouseup = closeDragElement;
+    document.onmousemove = elementDrag;
+  }
+
+  function elementDrag(e) {
+    e = e || window.event;
+    e.preventDefault();
+    pos1 = pos3 - e.clientX;
+    pos2 = pos4 - e.clientY;
+    pos3 = e.clientX;
+    pos4 = e.clientY;
+    content.style.top = (content.offsetTop - pos2) + 'px';
+    content.style.left = (content.offsetLeft - pos1) + 'px';
+  }
+
+  function closeDragElement() {
+    document.onmouseup = null;
+    document.onmousemove = null;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────

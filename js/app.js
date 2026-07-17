@@ -407,7 +407,9 @@ class SipenaApp {
       const stores = [
         'meta', 'users', 'bkph', 'rph', 'tpg', 'petak', 'anak_petak',
         'penyadap_master', 'penugasan', 'ro', 'realisasi', 'kehadiran',
-        'monitoring', 'areal_sadap', 'penyadap'
+        'monitoring', 'areal_sadap', 'penyadap',
+        'target_bkph', 'target_rph', 'target_tpg', 'target_mandor',
+        'target_penyadap', 'target_anak_petak'
       ];
       for (const store of stores) {
         const items = window.SIPENA_SEED_DATA[store];
@@ -794,7 +796,8 @@ class SipenaApp {
       const stores = [
         'meta', 'users', 'bkph', 'rph', 'tpg', 'petak', 'anak_petak',
         'penyadap_master', 'penugasan', 'ro', 'realisasi', 'kehadiran',
-        'monitoring'
+        'monitoring', 'target_bkph', 'target_rph', 'target_tpg', 'target_mandor',
+        'target_penyadap', 'target_anak_petak'
       ];
       
       const backupData = {};
@@ -851,7 +854,8 @@ class SipenaApp {
       const stores = [
         'meta', 'users', 'bkph', 'rph', 'tpg', 'petak', 'anak_petak',
         'penyadap_master', 'penugasan', 'ro', 'realisasi', 'kehadiran',
-        'monitoring'
+        'monitoring', 'target_bkph', 'target_rph', 'target_tpg', 'target_mandor',
+        'target_penyadap', 'target_anak_petak'
       ];
       
       for (const store of stores) {
@@ -870,11 +874,57 @@ class SipenaApp {
       
       localStorage.setItem('sipena_skip_seed', '1');
       
-      alert('Pemulihan database berhasil! Aplikasi akan memuat ulang.');
+      alert('Pemulihan database berhasil! Halaman akan memuat ulang.');
       location.reload();
     } catch (err) {
       console.error('[Restore Error]', err);
       this.showToast('Gagal memulihkan database: ' + err.message, 'danger');
+    }
+  }
+
+  /**
+   * Serializes current IndexedDB data and saves it to local js/seed-data.js file.
+   */
+  async makeCurrentDataSeed() {
+    if (!confirm('Apakah Anda yakin ingin menjadikan seluruh data yang saat ini Anda input sebagai data seed (awal) aplikasi?\nIni akan memperbarui file "js/seed-data.js".')) {
+      return;
+    }
+
+    try {
+      this.showToast('Mengumpulkan data lokal...', 'info');
+
+      const stores = [
+        'meta', 'users', 'bkph', 'rph', 'tpg', 'petak', 'anak_petak',
+        'penyadap_master', 'penugasan', 'ro', 'realisasi', 'kehadiran',
+        'monitoring', 'target_bkph', 'target_rph', 'target_tpg', 'target_mandor',
+        'target_penyadap', 'target_anak_petak'
+      ];
+
+      const seedData = {};
+      for (const store of stores) {
+        seedData[store] = await window.db.getAll(store);
+      }
+
+      this.showToast('Menyimpan ke file seed...', 'info');
+
+      const res = await fetch('save_seed.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(seedData)
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        this.showToast('Sukses! Data saat ini berhasil dijadikan data seed baru.', 'success');
+        alert('Data seed berhasil diperbarui! Jika Anda mereset database nanti, data yang Anda input sekarang yang akan dimuat.');
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (err) {
+      console.error('[Save Seed Error]', err);
+      this.showToast('Gagal menyimpan data seed: ' + err.message, 'danger');
     }
   }
 

@@ -130,14 +130,20 @@ const RealisasiModule = (() => {
     const period = day <= 15 ? 1 : 2;
 
     const allRO = await window.db.getAllActive('ro');
-    const matchingRO = allRO.find(ro => 
-      ro.tahun === year &&
-      ro.bulan === month &&
-      ro.periode === period &&
-      ro.penyadap_id === penyadapId
-    );
+    console.log('[DEBUG RO] allRO:', allRO);
+    console.log('[DEBUG RO] Searching for:', { year, month, period, penyadapId });
+    
+    const matchingRO = allRO.find(ro => {
+      const matchTahun = parseInt(ro.tahun) === parseInt(year);
+      const matchBulan = parseInt(ro.bulan) === parseInt(month);
+      const matchPeriode = parseInt(ro.periode) === parseInt(period);
+      const matchPenyadap = ro.penyadap_id === penyadapId;
+      console.log(`[DEBUG RO] Comparing item:`, ro, { matchTahun, matchBulan, matchPeriode, matchPenyadap });
+      return matchTahun && matchBulan && matchPeriode && matchPenyadap;
+    });
 
     const target = matchingRO ? (matchingRO.kesanggupan || 0) : 0;
+    console.log('[DEBUG RO] Result target:', target);
     elHelper.value = target + ' kg';
   }
 

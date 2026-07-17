@@ -93,7 +93,10 @@ const MasterPenugasan = (() => {
     if ((role === 'mandor' || role === 'tpg') && scope) {
       filteredAP = allAP.filter(ap => {
         if (ap.tpg_id !== scope) return false;
-        if (role === 'mandor' && ap.mandor_id !== user.id) return false;
+        if (role === 'mandor') {
+          const parentPetak = allPetak.find(p => p.id === ap.petak_id);
+          if (!parentPetak || parentPetak.mandor_id !== user.id) return false;
+        }
         return true;
       });
     }

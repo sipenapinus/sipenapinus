@@ -662,14 +662,26 @@ const DashboardModule = (() => {
       mandors = mandors.filter(u => u.nama_lengkap.toLowerCase().includes(state.search.toLowerCase()));
     }
 
-    const cardsHtml = await Promise.all(mandors.map(async m => {
-      const tar = allTarMdr.find(x => x.tahun === year && x.mandor_id === m.id);
-      const targetKg = tar ? tar.target_kg : 0;
+    const allApTargets = await window.db.getAllActive('target_anak_petak');
+    const apTargetList = allApTargets.filter(x => parseInt(x.tahun) === parseInt(year));
 
-      // Realisasi Mandor Sadap: hitung timbangan getah bersih penyadap di anak petak scope TPG mandor tersebut
-      // (Berdasarkan relasi penugasan aktif)
+    const cardsHtml = await Promise.all(mandors.map(async m => {
+      const myApIds = allAP.filter(ap => {
+        const petak = allPetak.find(p => p.id === ap.petak_id);
+        return petak && petak.mandor_id === m.id;
+      }).map(ap => ap.id);
+
+      const targetKg = apTargetList.filter(t => myApIds.includes(t.anak_petak_id)).reduce((s, t) => s + (t.target_kg || 0), 0);
+
+      // Dapatkan penyadap aktif di bawah wilayah mandor m ini saja
+      const pndOfMdr = _getPenyadapIdsByApIds(myApIds, allPgn);
+
+      // Kehadiran penyadap khusus mandor m
+      const khdMdr = _buildKehadiranSummary(pndOfMdr, todayStr, allKehadiran);
+
+      // Realisasi Mandor Sadap: hitung timbangan getah bersih penyadap di bawah mandor m
       const realMdr = allReal
-        .filter(rl => rl.tpg_id === tpgId && new Date(rl.tanggal).getFullYear() === year)
+        .filter(rl => pndOfMdr.includes(rl.penyadap_id) && new Date(rl.tanggal).getFullYear() === year)
         .reduce((sum, rl) => sum + (rl.berat_bersih || 0), 0);
 
       const st = getStatusIndicator(realMdr, targetKg);
@@ -686,12 +698,17 @@ const DashboardModule = (() => {
           </div>
           <div style="margin-top:1rem;">
             <div style="font-size:.8rem;color:var(--text-secondary);">Realisasi vs Target Mandor:</div>
-            <strong style="font-size:1.25rem;">${realMdr.toLocaleString('id-ID')} / ${targetKg.toLocaleString('id-ID')} kg</strong>
+            <strong style="font-size:1.25rem;">
+              ${realMdr.toLocaleString('id-ID')} / ${targetKg.toLocaleString('id-ID')} kg
+              <span style="font-size:0.85rem;font-weight:600;color:${targetKg > 0 ? (realMdr/targetKg >= 1 ? 'var(--primary)' : realMdr/targetKg >= 0.8 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-secondary)'};">
+                (${targetKg > 0 ? ((realMdr/targetKg)*100).toFixed(1) : 0}%)
+              </span>
+            </strong>
             <div class="progress-bar-container" style="margin-top:.5rem;">
               <div class="progress-bar-fill" style="width: ${targetKg > 0 ? Math.min(100, (realMdr/targetKg)*100) : 0}%; background-color:${st.color};"></div>
             </div>
           </div>
-          ${_buildKehadiranCardHtml(khdTpg)}
+          ${_buildKehadiranCardHtml(khdMdr)}
         </div>
       `;
     }));
@@ -749,16 +766,25 @@ const DashboardModule = (() => {
     const petakList = allPetak.filter(pt => petakIds.includes(pt.id));
 
     // Kumpulkan seluruh data penyadap di anak petak mandor
-    const targetPndOfMdr = allTarPnd.filter(tp => tp.tahun === t && apOfTpg.map(ap => ap.id).includes(tp.anak_petak_id));
+    const targetPndOfMdr = allTarPnd.filter(tp => parseInt(tp.tahun) === parseInt(t) && apOfTpg.map(ap => ap.id).includes(tp.anak_petak_id));
 
     // Perhitungan Ringkasan Metrik
-    // 1. Target Periode: Target Tahunan / 12 (karena sebulan 2 periode, target tahunan dibagi 12 bulan)
-    const sumTargetTahun = targetPndOfMdr.reduce((sum, x) => sum + (x.target_kg || 0), 0);
+    // Target Mandor didapatkan langsung dari akumulasi target petak (anak petak) pangkuannya
+    const allApTargets = await window.db.getAllActive('target_anak_petak');
+    const apTargetList = allApTargets.filter(x => parseInt(x.tahun) === parseInt(t));
+    const myApIds = allAP.filter(ap => {
+      const petak = allPetak.find(p => p.id === ap.petak_id);
+      return petak && petak.mandor_id === mandorId;
+    }).map(ap => ap.id);
+
+    const sumTargetTahun = apTargetList.filter(x => myApIds.includes(x.anak_petak_id)).reduce((sum, x) => sum + (x.target_kg || 0), 0);
+
+
     const targetPeriode = sumTargetTahun / 12;
 
     // 2. Rencana Operasional (RO) Periode ini
     const roPeriodeList = allRO.filter(ro => 
-      ro.tahun === t && ro.bulan === b && ro.periode === p &&
+      parseInt(ro.tahun) === parseInt(t) && parseInt(ro.bulan) === parseInt(b) && parseInt(ro.periode) === parseInt(p) &&
       apOfTpg.map(ap => ap.id).includes(ro.areal_id)
     );
     const roPeriode = roPeriodeList.reduce((sum, x) => sum + (x.kesanggupan || 0), 0);
@@ -777,20 +803,20 @@ const DashboardModule = (() => {
       const rlYear = d.getFullYear();
       const rlMonth = d.getMonth() + 1;
       const rlDay = d.getDate();
-      if (rlYear !== t || rlMonth !== b) return false;
-      if (p === 1) return rlDay >= 1 && rlDay <= 15;
+      if (parseInt(rlYear) !== parseInt(t) || parseInt(rlMonth) !== parseInt(b)) return false;
+      if (parseInt(p) === 1) return rlDay >= 1 && rlDay <= 15;
       return rlDay >= 16;
     });
     const realPeriode = realPeriodeList.reduce((sum, x) => sum + (x.berat_bersih || 0), 0);
 
     // Bulan ini
     const realBulan = allReal
-      .filter(rl => rl.tpg_id === scopeTpgId && new Date(rl.tanggal).getFullYear() === t && new Date(rl.tanggal).getMonth() + 1 === b)
+      .filter(rl => rl.tpg_id === scopeTpgId && parseInt(new Date(rl.tanggal).getFullYear()) === parseInt(t) && parseInt(new Date(rl.tanggal).getMonth() + 1) === parseInt(b))
       .reduce((sum, x) => sum + (x.berat_bersih || 0), 0);
 
     // Tahun ini
     const realTahun = allReal
-      .filter(rl => rl.tpg_id === scopeTpgId && new Date(rl.tanggal).getFullYear() === t)
+      .filter(rl => rl.tpg_id === scopeTpgId && parseInt(new Date(rl.tanggal).getFullYear()) === parseInt(t))
       .reduce((sum, x) => sum + (x.berat_bersih || 0), 0);
 
     // Progress
@@ -832,10 +858,10 @@ const DashboardModule = (() => {
       <!-- Metrik Utama -->
       <div class="metrics-grid" style="margin-bottom:2rem;">
         <div class="card metric-card">
-          <div class="metric-header"><span class="metric-title">TARGET</span><span class="metric-icon">🎯</span></div>
+          <div class="metric-header"><span class="metric-title">TARGET MANDOR</span><span class="metric-icon">🎯</span></div>
           <div>
-            <div class="metric-value">${targetPeriode.toLocaleString('id-ID')} <span style="font-size:1rem;color:var(--text-secondary);">kg</span></div>
-            <div class="metric-footer">Dari Target Tahunan ${sumTargetTahun.toLocaleString('id-ID')} kg</div>
+            <div class="metric-value">${sumTargetTahun.toLocaleString('id-ID')} <span style="font-size:1rem;color:var(--text-secondary);">kg</span></div>
+            <div class="metric-footer">Total Target Petak Pangkuan</div>
           </div>
         </div>
 
@@ -867,9 +893,9 @@ const DashboardModule = (() => {
           <div class="metric-header"><span class="metric-title">SELISIH RO - REALISASI</span><span class="metric-icon">⚖️</span></div>
           <div>
             <div class="metric-value" style="color: ${realPeriode >= roPeriode ? 'var(--primary)' : 'var(--danger)'};">
-              ${Math.max(0, roPeriode - realPeriode).toLocaleString('id-ID')} <span style="font-size:1rem;color:var(--text-secondary);">kg</span>
+              ${realPeriode >= roPeriode ? '+' : ''}${(realPeriode - roPeriode).toLocaleString('id-ID')} <span style="font-size:1rem;color:var(--text-secondary);">kg</span>
             </div>
-            <div class="metric-footer">Sisa kesanggupan RO</div>
+            <div class="metric-footer">${realPeriode >= roPeriode ? 'Surplus dari kesanggupan RO' : 'Kurang dari kesanggupan RO'}</div>
           </div>
         </div>
       </div>
@@ -1201,58 +1227,23 @@ const DashboardModule = (() => {
   //  Attendance (Absen) Kehadiran Penyadap
   // ─────────────────────────────────────────────────────────────
 
-  async function openAttendanceModal(mandorId) {
-    const todayStr = '2026-07-15'; // Tanggal aktif dashboard/hari ini
-    document.getElementById('attendance-date').value = todayStr;
-
-    // Load data relasional
-    const mandorUser = await window.db.get('users', mandorId);
-    let scopeTpgId = mandorUser ? mandorUser.scope : null;
-    
-    if (!scopeTpgId) {
-      // Auto-detect dari anak_petak
-      const allAPTemp = await window.db.getAllActive('anak_petak');
-      const allTarTemp = await window.db.getAllActive('target_penyadap');
-      const firstAP = allAPTemp.find(ap => allTarTemp.some(tp => tp.anak_petak_id === ap.id));
-      if (firstAP && firstAP.tpg_id) scopeTpgId = firstAP.tpg_id;
-    }
-
-    const allAP = await window.db.getAllActive('anak_petak');
-    const allPnd = await window.db.getAllActive('penyadap_master');
-    const allTarPnd = await window.db.getAllActive('target_penyadap');
-    const allKehadiran = await window.db.getAllActive('kehadiran');
-
-    // Dapatkan penyadap aktif di bawah wilayah mandor ini
-    const apOfTpg = allAP.filter(ap => ap.tpg_id === scopeTpgId);
-    const targetPndOfMdr = allTarPnd.filter(tp => tp.tahun === state.tahun && apOfTpg.map(ap => ap.id).includes(tp.anak_petak_id));
-    const activePndIds = [...new Set(targetPndOfMdr.map(tp => tp.penyadap_id))];
-    const penyadaps = allPnd.filter(p => activePndIds.includes(p.id));
-
-    const tbody = document.getElementById('attendance-list-tbody');
-    if (!tbody) return;
-
-    if (penyadaps.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="2" class="empty-state">Tidak ada penyadap aktif di wilayah TPG Anda</td></tr>`;
-      U().openModal('attendance-modal');
-      return;
-    }
+  function _renderAttendanceList(tbody, penyadaps, selectedDate, allKehadiran) {
+    const options = [
+      { val: 'hadir',         label: '🟢 Hadir' },
+      { val: 'pembaharuan_1', label: '🟢 Pembaharuan 1' },
+      { val: 'pembaharuan_2', label: '🟢 Pembaharuan 2' },
+      { val: 'pembaharuan_3', label: '🟢 Pembaharuan 3' },
+      { val: 'pengecasan',    label: '🟢 Pengecasan/Stimulasi' },
+      { val: 'ludang',        label: '🟢 Ludang' },
+      { val: 'sakit',        label: '🟡 Sakit' },
+      { val: 'izin',         label: '⚪ Izin' },
+      { val: 'tidak_hadir',  label: '🔴 Alpa' }
+    ];
 
     tbody.innerHTML = penyadaps.map(p => {
-      // Cari status absen jika sudah dicatat sebelumnya untuk tanggal ini
-      const khd = allKehadiran.find(k => k.tanggal === todayStr && k.penyadap_id === p.id);
+      // Cari status absen jika sudah dicatat sebelumnya untuk tanggal terpilih
+      const khd = allKehadiran.find(k => k.tanggal === selectedDate && k.penyadap_id === p.id);
       const activeStatus = khd ? khd.status : 'hadir'; // default 'hadir'
-
-      const options = [
-        { val: 'hadir',         label: '🟢 Hadir' },
-        { val: 'pembaharuan_1', label: '🟢 Pembaharuan 1' },
-        { val: 'pembaharuan_2', label: '🟢 Pembaharuan 2' },
-        { val: 'pembaharuan_3', label: '🟢 Pembaharuan 3' },
-        { val: 'pengecasan',    label: '🟢 Pengecasan/Stimulasi' },
-        { val: 'ludang',        label: '🟢 Ludang' },
-        { val: 'sakit',        label: '🟡 Sakit' },
-        { val: 'izin',         label: '⚪ Izin' },
-        { val: 'tidak_hadir',  label: '🔴 Alpa' }
-      ];
 
       const selectsHtml = `
         <select class="form-control attendance-status-select" data-penyadap-id="${p.id}" style="margin:0; max-width:180px;">
@@ -1272,6 +1263,57 @@ const DashboardModule = (() => {
         </tr>
       `;
     }).join('');
+  }
+
+  async function openAttendanceModal(mandorId) {
+    const defaultDate = '2026-07-15'; // Tanggal aktif dashboard/hari ini
+    const dateInput = document.getElementById('attendance-date');
+    if (dateInput) dateInput.value = defaultDate;
+
+    // Load data relasional
+    const mandorUser = await window.db.get('users', mandorId);
+    let scopeTpgId = mandorUser ? mandorUser.scope : null;
+    
+    if (!scopeTpgId) {
+      // Auto-detect dari anak_petak
+      const allAPTemp = await window.db.getAllActive('anak_petak');
+      const allTarTemp = await window.db.getAllActive('target_penyadap');
+      const firstAP = allAPTemp.find(ap => allTarTemp.some(tp => tp.anak_petak_id === ap.id));
+      if (firstAP && firstAP.tpg_id) scopeTpgId = firstAP.tpg_id;
+    }
+
+    const allAP = await window.db.getAllActive('anak_petak');
+    const allPnd = await window.db.getAllActive('penyadap_master');
+    const allTarPnd = await window.db.getAllActive('target_penyadap');
+    let allKehadiran = await window.db.getAllActive('kehadiran');
+
+    // Dapatkan penyadap aktif di bawah wilayah mandor ini
+    const apOfTpg = allAP.filter(ap => ap.tpg_id === scopeTpgId);
+    const targetPndOfMdr = allTarPnd.filter(tp => parseInt(tp.tahun) === parseInt(state.tahun) && apOfTpg.map(ap => ap.id).includes(tp.anak_petak_id));
+    const activePndIds = [...new Set(targetPndOfMdr.map(tp => tp.penyadap_id))];
+    const penyadaps = allPnd.filter(p => activePndIds.includes(p.id));
+
+    const tbody = document.getElementById('attendance-list-tbody');
+    if (!tbody) return;
+
+    if (penyadaps.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="2" class="empty-state">Tidak ada penyadap aktif di wilayah TPG Anda</td></tr>`;
+      U().openModal('attendance-modal');
+      return;
+    }
+
+    // Render baris pertama kali
+    _renderAttendanceList(tbody, penyadaps, defaultDate, allKehadiran);
+
+    // Ketersediaan dinamis saat tanggal picker diubah
+    if (dateInput) {
+      dateInput.onchange = async function() {
+        const newDate = this.value;
+        if (!newDate) return;
+        allKehadiran = await window.db.getAllActive('kehadiran');
+        _renderAttendanceList(tbody, penyadaps, newDate, allKehadiran);
+      };
+    }
 
     U().openModal('attendance-modal');
   }
