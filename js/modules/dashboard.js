@@ -219,6 +219,70 @@ const DashboardModule = (() => {
     if (pct >= 80) return { label: 'Kurang', cls: 'status-yellow', color: 'var(--warning)' };
     return { label: 'Tertinggal', cls: 'status-red', color: 'var(--danger)' };
   }
+  // ── Helpers: Kehadiran Hierarki ─────────────────────────────────
+  function _getPenyadapIdsByApIds(apIds, allPgn) {
+    return [...new Set(
+      allPgn.filter(pg => apIds.includes(pg.anak_petak_id) && pg.aktif === 1).map(pg => pg.penyadap_id)
+    )];
+  }
+
+  function _buildKehadiranSummary(penyadapIds, todayStr, allKehadiran) {
+    if (!penyadapIds || penyadapIds.length === 0)
+      return { total:0, aktif:0, hadir:0, pemb1:0, pemb2:0, pemb3:0, pengecasan:0, ludang:0, sakit:0, izin:0, tidakHadir:0, belumCde:0 };
+    const khds = allKehadiran.filter(k => k.tanggal === todayStr && penyadapIds.includes(k.penyadap_id));
+    const AKTIF = ['hadir','pembaharuan_1','pembaharuan_2','pembaharuan_3','pengecasan','ludang'];
+    return {
+      total:      penyadapIds.length,
+      aktif:      khds.filter(k => AKTIF.includes(k.status)).length,
+      hadir:      khds.filter(k => k.status === 'hadir').length,
+      pemb1:      khds.filter(k => k.status === 'pembaharuan_1').length,
+      pemb2:      khds.filter(k => k.status === 'pembaharuan_2').length,
+      pemb3:      khds.filter(k => k.status === 'pembaharuan_3').length,
+      pengecasan: khds.filter(k => k.status === 'pengecasan').length,
+      ludang:     khds.filter(k => k.status === 'ludang').length,
+      sakit:      khds.filter(k => k.status === 'sakit').length,
+      izin:       khds.filter(k => k.status === 'izin').length,
+      tidakHadir: khds.filter(k => k.status === 'tidak_hadir').length,
+      belumCde:   Math.max(0, penyadapIds.length - khds.length)
+    };
+  }
+
+  function _buildKehadiranCardHtml(s) {
+    if (s.total === 0) return '';
+    const det = [
+      s.hadir      > 0 ? `└ Hadir: <b>${s.hadir}</b>`           : null,
+      s.pemb1      > 0 ? `└ Pemb.1: <b>${s.pemb1}</b>`          : null,
+      s.pemb2      > 0 ? `└ Pemb.2: <b>${s.pemb2}</b>`          : null,
+      s.pemb3      > 0 ? `└ Pemb.3: <b>${s.pemb3}</b>`          : null,
+      s.pengecasan > 0 ? `└ Pengecasan: <b>${s.pengecasan}</b>` : null,
+      s.ludang     > 0 ? `└ Ludang: <b>${s.ludang}</b>`         : null,
+    ].filter(Boolean);
+    return `<div style="margin-top:.6rem;padding-top:.5rem;border-top:1px solid var(--border-color);font-size:.78rem;line-height:1.85;">
+      <div style="font-size:.7rem;color:var(--text-secondary);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">👷 Kehadiran Hari Ini</div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--primary);font-weight:600;">✅ Aktif Kerja</span><strong style="color:var(--primary);">${s.aktif} / ${s.total}</strong></div>
+      ${det.length > 0 ? `<div style="padding-left:.4rem;color:var(--text-secondary);font-size:.71rem;display:flex;flex-wrap:wrap;gap:.1rem .5rem;">${det.map(d => `<span>${d}</span>`).join('')}</div>` : ''}
+      ${s.sakit      > 0 ? `<div style="display:flex;justify-content:space-between;"><span>🟡 Sakit</span><strong style="color:var(--warning);">${s.sakit}</strong></div>` : ''}
+      ${s.izin       > 0 ? `<div style="display:flex;justify-content:space-between;"><span>⚪ Izin</span><strong style="color:var(--text-secondary);">${s.izin}</strong></div>` : ''}
+      ${s.tidakHadir > 0 ? `<div style="display:flex;justify-content:space-between;"><span>🔴 Tidak Hadir</span><strong style="color:var(--danger);">${s.tidakHadir}</strong></div>` : ''}
+      <div style="display:flex;justify-content:space-between;"><span>⏳ Belum di CDE</span><strong>${s.belumCde}</strong></div>
+    </div>`;
+  }
+
+  function _buildKehadiranBannerHtml(s) {
+    if (s.total === 0) return '';
+    return `<div style="background:var(--bg-surface-elevated);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:.75rem 1rem;margin-bottom:1.25rem;">
+      <div style="font-size:.72rem;color:var(--text-secondary);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">👷 Ringkasan Kehadiran Penyadap Hari Ini &nbsp;<span style="font-weight:400;">(Total Penyadap: ${s.total})</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:.35rem 1.25rem;font-size:.8rem;align-items:baseline;">
+        <span style="color:var(--primary);font-weight:700;">✅ Aktif: ${s.aktif}</span>
+        <span style="color:var(--text-secondary);font-size:.72rem;">(Hadir:${s.hadir} | Pemb.1:${s.pemb1} | Pemb.2:${s.pemb2} | Pemb.3:${s.pemb3} | Pengecasan:${s.pengecasan} | Ludang:${s.ludang})</span>
+        <span style="color:var(--warning);font-weight:600;">🟡 Sakit: ${s.sakit}</span>
+        <span style="color:var(--text-secondary);">⚪ Izin: ${s.izin}</span>
+        <span style="color:var(--danger);font-weight:600;">🔴 Alpa: ${s.tidakHadir}</span>
+        <span style="font-weight:600;">⏳ Belum di CDE: ${s.belumCde}</span>
+      </div>
+    </div>`;
+  }
+
   // ── Helper untuk membangun Summary Banner makro di bagian atas ──
   function buildSummaryBannerHtml(title, totalLuas, targetTahun, realTahun, pctTahun, roPeriode, pctRoTahun, realPeriode, pctReal, statusColor) {
     return `
@@ -258,14 +322,18 @@ const DashboardModule = (() => {
 
   // ── 1. BKPH Level: Tampilkan RPH list ──────────────────────────
   async function renderBKPHLevel(container) {
-    const allRph    = await window.db.getAllActive('rph');
-    const allTpg    = await window.db.getAllActive('tpg');
-    const allReal   = await window.db.getAllActive('realisasi');
-    const allTarRph = await window.db.getAllActive('target_rph');
-    const allUsers  = await window.db.getAllActive('users');
-    const allPetak  = await window.db.getAllActive('petak');
+    const allRph       = await window.db.getAllActive('rph');
+    const allTpg       = await window.db.getAllActive('tpg');
+    const allReal      = await window.db.getAllActive('realisasi');
+    const allTarRph    = await window.db.getAllActive('target_rph');
+    const allUsers     = await window.db.getAllActive('users');
+    const allPetak     = await window.db.getAllActive('petak');
+    const allAP        = await window.db.getAllActive('anak_petak');
+    const allPgn       = await window.db.getAllActive('penugasan');
+    const allKehadiran = await window.db.getAllActive('kehadiran');
 
-    const year = state.tahun;
+    const year     = state.tahun;
+    const todayStr = new Date().toISOString().split('T')[0];
 
     // ── KALKULASI SUMMARY BANNER BKPH ──
     const allTarBkph = await window.db.getAllActive('target_bkph');
@@ -308,6 +376,11 @@ const DashboardModule = (() => {
       st.color
     );
 
+    // Kehadiran total BKPH hari ini (semua penyadap aktif)
+    const allApIds  = allAP.map(ap => ap.id);
+    const allPndIds = _getPenyadapIdsByApIds(allApIds, allPgn);
+    const khdBkph   = _buildKehadiranSummary(allPndIds, todayStr, allKehadiran);
+
     let rphs = allRph;
     if (state.search) {
       rphs = allRph.filter(r => r.nama.toLowerCase().includes(state.search.toLowerCase()));
@@ -331,6 +404,12 @@ const DashboardModule = (() => {
       const st  = getStatusIndicator(realRph, targetKg);
 
       if (state.filterStatus && st.cls !== `status-${state.filterStatus}`) return '';
+
+      // Kehadiran per RPH hari ini
+      const tpgIdsRph = allTpg.filter(tt => tt.rph_id === r.id).map(tt => tt.id);
+      const apIdsRph  = allAP.filter(ap => tpgIdsRph.includes(ap.tpg_id)).map(ap => ap.id);
+      const pndIdsRph = _getPenyadapIdsByApIds(apIdsRph, allPgn);
+      const khdRph    = _buildKehadiranSummary(pndIdsRph, todayStr, allKehadiran);
 
       // Nama KRPH (role='krph', scope=rph.id)
       const krph = allUsers.find(u => u.role === 'krph' && u.scope === r.id);
@@ -361,6 +440,7 @@ const DashboardModule = (() => {
             <div class="progress-bar-container" style="margin-top:.25rem;">
               <div class="progress-bar-fill" style="width:${Math.min(100, pct)}%;background-color:${st.color};"></div>
             </div>
+            ${_buildKehadiranCardHtml(khdRph)}
           </div>
         </div>
       `;
@@ -368,6 +448,7 @@ const DashboardModule = (() => {
 
     container.innerHTML = `
       ${bannerHtml}
+      ${_buildKehadiranBannerHtml(khdBkph)}
       <h3 style="margin-bottom:1rem;color:var(--primary);">Daftar Wilayah RPH</h3>
       <div class="metrics-grid">
         ${cardsHtml.join('') || '<div class="empty-state" style="grid-column:1/-1;">Tidak ada data RPH yang sesuai filter</div>'}
@@ -377,12 +458,15 @@ const DashboardModule = (() => {
 
   // ── 2. RPH Level: Tampilkan TPG list ──────────────────────────
   async function renderRPHLevel(container, rphId) {
-    const allTpg    = await window.db.getAllActive('tpg');
-    const allReal   = await window.db.getAllActive('realisasi');
-    const allTarTpg = await window.db.getAllActive('target_tpg');
-    const allUsers  = await window.db.getAllActive('users');
-    const allPetak  = await window.db.getAllActive('petak');
-    const year = state.tahun;
+    const allTpg       = await window.db.getAllActive('tpg');
+    const allReal      = await window.db.getAllActive('realisasi');
+    const allTarTpg    = await window.db.getAllActive('target_tpg');
+    const allUsers     = await window.db.getAllActive('users');
+    const allPetak     = await window.db.getAllActive('petak');
+    const allPgn       = await window.db.getAllActive('penugasan');
+    const allKehadiran = await window.db.getAllActive('kehadiran');
+    const year     = state.tahun;
+    const todayStr = new Date().toISOString().split('T')[0];
 
     // ── KALKULASI SUMMARY BANNER RPH ──
     const allTarRph = await window.db.getAllActive('target_rph');
@@ -433,6 +517,10 @@ const DashboardModule = (() => {
       st.color
     );
 
+    // Kehadiran total RPH hari ini
+    const pndOfRph = _getPenyadapIdsByApIds(apOfRph, allPgn);
+    const khdRph   = _buildKehadiranSummary(pndOfRph, todayStr, allKehadiran);
+
     let tpgs = allTpg.filter(t => t.rph_id === rphId);
     if (state.search) {
       tpgs = tpgs.filter(t => t.nama.toLowerCase().includes(state.search.toLowerCase()));
@@ -461,6 +549,11 @@ const DashboardModule = (() => {
         ? `<div style="font-size:.78rem;color:var(--text-secondary);margin-top:.2rem;">Mandor ${mandorTpg.nama_lengkap}</div>`
         : '';
 
+      // Kehadiran per TPG hari ini
+      const apIdsTpg  = allAP.filter(ap => ap.tpg_id === t.id).map(ap => ap.id);
+      const pndIdsTpg = _getPenyadapIdsByApIds(apIdsTpg, allPgn);
+      const khdTpg    = _buildKehadiranSummary(pndIdsTpg, todayStr, allKehadiran);
+
       return `
         <div class="card metric-card hover-card" onclick="DashboardModule.drillTo('tpg', '${t.id}', '${t.nama}')" style="border-left:5px solid ${st.color};cursor:pointer;">
           <div class="metric-header">
@@ -484,6 +577,7 @@ const DashboardModule = (() => {
             <div class="progress-bar-container" style="margin-top:.25rem;">
               <div class="progress-bar-fill" style="width:${Math.min(100, pct)}%;background-color:${st.color};"></div>
             </div>
+            ${_buildKehadiranCardHtml(khdTpg)}
           </div>
         </div>
       `;
@@ -491,6 +585,7 @@ const DashboardModule = (() => {
 
     container.innerHTML = `
       ${bannerHtml}
+      ${_buildKehadiranBannerHtml(khdRph)}
       <h3 style="margin-bottom:1rem;color:var(--primary);">Daftar TPG</h3>
       <div class="metrics-grid">
         ${cardsHtml.join('') || '<div class="empty-state" style="grid-column:1/-1;">Tidak ada data TPG yang sesuai filter</div>'}
@@ -500,12 +595,22 @@ const DashboardModule = (() => {
 
   // ── 3. TPG Level: Tampilkan Mandor list ───────────────────────
   async function renderTPGLevel(container, tpgId) {
-    const allUsers = await window.db.getAllActive('users');
-    const allReal  = await window.db.getAllActive('realisasi');
-    const allTarMdr = await window.db.getAllActive('target_mandor');
-    const allAP    = await window.db.getAllActive('anak_petak');
-    const allPetak  = await window.db.getAllActive('petak');
-    const year = state.tahun;
+    const allUsers     = await window.db.getAllActive('users');
+    const allReal      = await window.db.getAllActive('realisasi');
+    const allTarMdr    = await window.db.getAllActive('target_mandor');
+    const allAP        = await window.db.getAllActive('anak_petak');
+    const allPetak     = await window.db.getAllActive('petak');
+    const allPgn       = await window.db.getAllActive('penugasan');
+    const allKehadiran = await window.db.getAllActive('kehadiran');
+    const year     = state.tahun;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Anak petak di bawah TPG ini (fix: definisikan apOfTpg sebelum dipakai di roPeriode)
+    const apOfTpg = allAP.filter(ap => ap.tpg_id === tpgId).map(ap => ap.id);
+
+    // Kehadiran seluruh penyadap di TPG ini hari ini
+    const pndOfTpg = _getPenyadapIdsByApIds(apOfTpg, allPgn);
+    const khdTpg   = _buildKehadiranSummary(pndOfTpg, todayStr, allKehadiran);
 
     // ── KALKULASI SUMMARY BANNER TPG ──
     const allTarTpg = await window.db.getAllActive('target_tpg');
@@ -586,12 +691,14 @@ const DashboardModule = (() => {
               <div class="progress-bar-fill" style="width: ${targetKg > 0 ? Math.min(100, (realMdr/targetKg)*100) : 0}%; background-color:${st.color};"></div>
             </div>
           </div>
+          ${_buildKehadiranCardHtml(khdTpg)}
         </div>
       `;
     }));
 
     container.innerHTML = `
       ${bannerHtml}
+      ${_buildKehadiranBannerHtml(khdTpg)}
       <h3 style="margin-bottom:1rem;color:var(--primary);">Daftar Mandor Sadap</h3>
       <div class="metrics-grid">
         ${cardsHtml.join('') || '<div class="empty-state" style="grid-column:1/-1;">Tidak ada data Mandor yang sesuai filter</div>'}
@@ -694,17 +801,19 @@ const DashboardModule = (() => {
     const activePndIds = [...new Set(targetPndOfMdr.map(tp => tp.penyadap_id))];
     const pndKehadiranToday = allKehadiran.filter(k => k.tanggal === todayStr && activePndIds.includes(k.penyadap_id));
     
-    // Status aktif: hadir + pembaharuan 1/2/3
-    const STATUS_AKTIF = ['hadir', 'pembaharuan_1', 'pembaharuan_2', 'pembaharuan_3'];
-    const countAktif       = pndKehadiranToday.filter(k => STATUS_AKTIF.includes(k.status)).length;
-    const countHadir       = pndKehadiranToday.filter(k => k.status === 'hadir').length;
-    const countPemb1       = pndKehadiranToday.filter(k => k.status === 'pembaharuan_1').length;
-    const countPemb2       = pndKehadiranToday.filter(k => k.status === 'pembaharuan_2').length;
-    const countPemb3       = pndKehadiranToday.filter(k => k.status === 'pembaharuan_3').length;
-    const countSakit       = pndKehadiranToday.filter(k => k.status === 'sakit').length;
-    const countIzin        = pndKehadiranToday.filter(k => k.status === 'izin').length;
-    const countTidakHadir  = pndKehadiranToday.filter(k => k.status === 'tidak_hadir').length;
-    const countBelumDicek  = Math.max(0, activePndIds.length - pndKehadiranToday.length);
+    // Status aktif: hadir + pembaharuan 1/2/3 + pengecasan + ludang
+    const STATUS_AKTIF = ['hadir', 'pembaharuan_1', 'pembaharuan_2', 'pembaharuan_3', 'pengecasan', 'ludang'];
+    const countAktif        = pndKehadiranToday.filter(k => STATUS_AKTIF.includes(k.status)).length;
+    const countHadir        = pndKehadiranToday.filter(k => k.status === 'hadir').length;
+    const countPemb1        = pndKehadiranToday.filter(k => k.status === 'pembaharuan_1').length;
+    const countPemb2        = pndKehadiranToday.filter(k => k.status === 'pembaharuan_2').length;
+    const countPemb3        = pndKehadiranToday.filter(k => k.status === 'pembaharuan_3').length;
+    const countPengecasan   = pndKehadiranToday.filter(k => k.status === 'pengecasan').length;
+    const countLudang       = pndKehadiranToday.filter(k => k.status === 'ludang').length;
+    const countSakit        = pndKehadiranToday.filter(k => k.status === 'sakit').length;
+    const countIzin         = pndKehadiranToday.filter(k => k.status === 'izin').length;
+    const countTidakHadir   = pndKehadiranToday.filter(k => k.status === 'tidak_hadir').length;
+    const countBelumDicek   = Math.max(0, activePndIds.length - pndKehadiranToday.length);
 
     // Setor getah
     const countSudahSetor = [...new Set(realPeriodeList.map(rl => rl.penyadap_id))].length;
@@ -779,11 +888,13 @@ const DashboardModule = (() => {
               <div style="display:flex;justify-content:space-between;padding-left:.5rem;"><span style="color:var(--text-secondary);">└ Hadir</span><strong style="color:var(--primary);">${countHadir}</strong></div>
               <div style="display:flex;justify-content:space-between;padding-left:.5rem;"><span style="color:var(--text-secondary);">└ Pembaharuan 1</span><strong style="color:var(--primary);">${countPemb1}</strong></div>
               <div style="display:flex;justify-content:space-between;padding-left:.5rem;"><span style="color:var(--text-secondary);">└ Pembaharuan 2</span><strong style="color:var(--primary);">${countPemb2}</strong></div>
-              <div style="display:flex;justify-content:space-between;padding-left:.5rem;margin-bottom:.25rem;"><span style="color:var(--text-secondary);">└ Pembaharuan 3</span><strong style="color:var(--primary);">${countPemb3}</strong></div>
+              <div style="display:flex;justify-content:space-between;padding-left:.5rem;"><span style="color:var(--text-secondary);">└ Pembaharuan 3</span><strong style="color:var(--primary);">${countPemb3}</strong></div>
+              <div style="display:flex;justify-content:space-between;padding-left:.5rem;"><span style="color:var(--text-secondary);">└ Pengecasan/Stimulasi</span><strong style="color:var(--primary);">${countPengecasan}</strong></div>
+              <div style="display:flex;justify-content:space-between;padding-left:.5rem;margin-bottom:.25rem;"><span style="color:var(--text-secondary);">└ Ludang</span><strong style="color:var(--primary);">${countLudang}</strong></div>
               <div style="display:flex;justify-content:space-between;"><span>🟡 Sakit</span><strong style="color:var(--warning);">${countSakit}</strong></div>
               <div style="display:flex;justify-content:space-between;"><span>⚪ Izin</span><strong style="color:var(--text-secondary);">${countIzin}</strong></div>
               <div style="display:flex;justify-content:space-between;"><span>🔴 Tidak Hadir</span><strong style="color:var(--danger);">${countTidakHadir}</strong></div>
-              <div style="display:flex;justify-content:space-between;"><span>⏳ Belum Dicek</span><strong>${countBelumDicek}</strong></div>
+              <div style="display:flex;justify-content:space-between;"><span>⏳ Belum di CDE</span><strong>${countBelumDicek}</strong></div>
             </div>
           </div>
           ${(window.app.currentUser.role === 'admin' || window.app.currentUser.role === 'mandor' || window.app.currentUser.role === 'tpg') ? `
@@ -885,12 +996,13 @@ const DashboardModule = (() => {
         totReal += realPenyadap;
 
         // Keterangan: jika sudah setor → tanggal setor
-        // jika belum setor → ambil dari kehadiran hari ini (Sakit/Izin/Tidak Hadir/Pembaharuan 1/2/3)
-        // jika tidak ada kehadiran → dari monitoring atau 'Belum Setor'
-        const STATUS_AKTIF_KET = ['hadir', 'pembaharuan_1', 'pembaharuan_2', 'pembaharuan_3'];
+        // jika belum setor → tampilkan "Belum Setor — [Alasan Kehadiran]"
+        // jika tidak ada kehadiran → dari monitoring atau hanya 'Belum Setor'
         const STATUS_LABEL = {
           'hadir': 'Hadir', 'pembaharuan_1': 'Pembaharuan 1',
           'pembaharuan_2': 'Pembaharuan 2', 'pembaharuan_3': 'Pembaharuan 3',
+          'pengecasan': 'Pengecasan/Stimulasi',
+          'ludang': 'Ludang',
           'sakit': 'Sakit', 'izin': 'Izin', 'tidak_hadir': 'Tidak Hadir'
         };
         const monPenyadap = monitoringToday.find(m => m.penyadap_id === targ.penyadap_id && m.anak_petak_id === targ.anak_petak_id);
@@ -905,18 +1017,26 @@ const DashboardModule = (() => {
           .sort((x, y) => new Date(y.tanggal) - new Date(x.tanggal))[0];
 
         if (lastRl) {
+          // ✅ Sudah setor → tampilkan tanggal setor
           const d = new Date(lastRl.tanggal);
           ket = `Setor ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
           ketBadge = 'badge-success';
-        } else if (khdPenyadap && !STATUS_AKTIF_KET.includes(khdPenyadap.status)) {
-          // Realisasi 0 + status tidak aktif → tampilkan alasan
-          ket = STATUS_LABEL[khdPenyadap.status] || khdPenyadap.status;
-          ketBadge = khdPenyadap.status === 'sakit' ? 'badge-warning' : 'badge-danger';
-        } else if (khdPenyadap && STATUS_AKTIF_KET.includes(khdPenyadap.status)) {
-          ket = STATUS_LABEL[khdPenyadap.status] || 'Hadir';
-          ketBadge = 'badge-inactive';
+        } else if (khdPenyadap) {
+          // ⚠️ Belum setor → tampilkan "Belum Setor — [Alasan dari Kehadiran]"
+          const statusLabel = STATUS_LABEL[khdPenyadap.status] || khdPenyadap.status;
+          ket = `Belum Setor \u2014 ${statusLabel}`;
+          if (khdPenyadap.status === 'sakit') {
+            ketBadge = 'badge-warning';       // 🟡 Kuning = Sakit
+          } else if (khdPenyadap.status === 'tidak_hadir') {
+            ketBadge = 'badge-danger';        // 🔴 Merah = Alpa
+          } else if (khdPenyadap.status === 'izin') {
+            ketBadge = 'badge-inactive';      // ⚫ Abu = Izin
+          } else {
+            ketBadge = 'badge-info';          // 🔵 Biru = Aktif tapi belum setor (Hadir/Pembaharuan/Ludang)
+          }
         } else if (monPenyadap) {
-          ket = monPenyadap.kategori;
+          // Tidak ada data kehadiran → ambil dari monitoring
+          ket = `Belum Setor \u2014 ${monPenyadap.kategori}`;
           ketBadge = 'badge-inactive';
         }
 
@@ -1127,6 +1247,8 @@ const DashboardModule = (() => {
         { val: 'pembaharuan_1', label: '🟢 Pembaharuan 1' },
         { val: 'pembaharuan_2', label: '🟢 Pembaharuan 2' },
         { val: 'pembaharuan_3', label: '🟢 Pembaharuan 3' },
+        { val: 'pengecasan',    label: '🟢 Pengecasan/Stimulasi' },
+        { val: 'ludang',        label: '🟢 Ludang' },
         { val: 'sakit',        label: '🟡 Sakit' },
         { val: 'izin',         label: '⚪ Izin' },
         { val: 'tidak_hadir',  label: '🔴 Alpa' }

@@ -243,6 +243,7 @@ const RealisasiModule = (() => {
 
     U().renderPagination(document.getElementById('realisasi-pagination'), pager, p => { state.page = p; render(); });
     _renderSummary(data, allRO);
+    await _renderBelumSetor(allRO, allPndMaster);
   }
 
   async function _renderSummary(data, allRO) {
@@ -260,6 +261,119 @@ const RealisasiModule = (() => {
     if (el('real-total-bersih')) el('real-total-bersih').textContent = totalBersih.toLocaleString('id-ID') + ' kg';
     if (el('real-total-trx'))    el('real-total-trx').textContent    = totalTrx    + ' transaksi';
     if (el('real-total-pnd'))    el('real-total-pnd').textContent    = pndAktif    + ' penyadap';
+  }
+
+  async function _renderBelumSetor(allRO, allPndMaster) {
+    const tbody  = document.getElementById('real-belum-setor-tbody');
+    const countEl = document.getElementById('real-belum-setor-count');
+    if (!tbody) return;
+
+    // Tentukan tahun & bulan dari filter aktif
+    const filterBulan = state.filterBulan || '';
+    const parts = filterBulan.split('-');
+    const filterYear  = parts.length === 2 ? parseInt(parts[0]) : null;
+    const filterMonth = parts.length === 2 ? parseInt(parts[1]) : null;
+
+    // Ambil semua RO di bulan/tahun yang difilter (scope sesuai role)
+    const filteredROs = await _getFilteredROs(allRO, filterBulan);
+
+    // Ambil semua realisasi periode ini (sudah difilter scope)
+    let allReal = await _getFilteredRealisasi();
+    if (filterBulan) allReal = allReal.filter(r => r.tanggal && r.tanggal.startsWith(filterBulan));
+
+    // Filter periode jika ada
+    let rosToCheck = filteredROs;
+    if (state.filterPeriode) {
+      const p = parseInt(state.filterPeriode);
+      rosToCheck = filteredROs.filter(ro => ro.periode === p);
+    }
+
+    // Ambil data pendukung
+    const allAP    = await window.db.getAllActive('anak_petak');
+    const allPetak = await window.db.getAllActive('petak');
+    const allKehadiran = await window.db.getAllActive('kehadiran');
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const STATUS_LABEL = {
+      'hadir':         'Hadir',
+      'pembaharuan_1': 'Pembaharuan 1',
+      'pembaharuan_2': 'Pembaharuan 2',
+      'pembaharuan_3': 'Pembaharuan 3',
+      'pengecasan':    'Pengecasan/Stimulasi',
+      'ludang':        'Ludang',
+      'sakit':         'Sakit',
+      'izin':          'Izin',
+      'tidak_hadir':   'Tidak Hadir / Alpa'
+    };
+
+    // Cari penyadap yang punya RO tapi belum setor realisasi di periode ini
+    const belumSetor = [];
+    for (const ro of rosToCheck) {
+      if (!ro.penyadap_id || (ro.kesanggupan || 0) <= 0) continue;
+
+      // Cek apakah sudah ada realisasi untuk penyadap ini di bulan+periode yang sama
+      const sudahSetor = allReal.some(r => {
+        if (r.penyadap_id !== ro.penyadap_id) return false;
+        if (!r.tanggal) return false;
+        const d = parseInt(r.tanggal.split('-')[2] || 0);
+        const pRl = d <= 15 ? 1 : 2;
+        const yRl = parseInt(r.tanggal.split('-')[0]);
+        const mRl = parseInt(r.tanggal.split('-')[1]);
+        return yRl === ro.tahun && mRl === ro.bulan && pRl === ro.periode;
+      });
+
+      if (!sudahSetor) {
+        // Cari data kehadiran hari ini
+        const khd = allKehadiran.find(k => k.tanggal === todayStr && k.penyadap_id === ro.penyadap_id);
+        const statusLabel = khd ? (STATUS_LABEL[khd.status] || khd.status) : null;
+
+        // Cari info anak petak & petak
+        const ap    = allAP.find(a => a.id === ro.areal_id);
+        const petak = ap ? allPetak.find(p => p.id === ap.petak_id) : null;
+        const petakLabel = petak && ap ? `Petak ${petak.nomor}${ap.huruf}` : (ro.areal_id || '—');
+
+        // Cari nama penyadap
+        const pnd = allPndMaster.find(p => p.id === ro.penyadap_id);
+
+        // Badge keterangan
+        let ketBadge = 'badge-inactive';
+        let ketText  = 'Belum ada data kehadiran';
+        if (khd) {
+          ketText = `Belum Setor \u2014 ${statusLabel}`;
+          if (khd.status === 'sakit')        ketBadge = 'badge-warning';
+          else if (khd.status === 'tidak_hadir') ketBadge = 'badge-danger';
+          else if (khd.status === 'izin')    ketBadge = 'badge-inactive';
+          else                               ketBadge = 'badge-info'; // aktif: hadir/pembaharuan/ludang
+        }
+
+        belumSetor.push({ ro, pnd, petakLabel, ketText, ketBadge });
+      }
+    }
+
+    // Update counter badge
+    if (countEl) {
+      countEl.textContent = belumSetor.length;
+      countEl.className = belumSetor.length === 0
+        ? 'badge badge-success'
+        : 'badge badge-warning';
+    }
+
+    if (belumSetor.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Semua penyadap yang punya RO sudah setor 🎉</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = belumSetor.map(({ ro, pnd, petakLabel, ketText, ketBadge }) => `
+      <tr>
+        <td>
+          <strong>${pnd ? pnd.nama : ro.penyadap_id}</strong>
+          <div class="text-muted-sm">${pnd ? pnd.nomor : '—'}</div>
+        </td>
+        <td><strong>${(ro.kesanggupan || 0).toLocaleString('id-ID')} kg</strong></td>
+        <td>${petakLabel}</td>
+        <td><span class="badge ${ketBadge}">${ketText}</span></td>
+      </tr>
+    `).join('');
   }
 
   async function _loadPenyadapDropdown(selectedId) {

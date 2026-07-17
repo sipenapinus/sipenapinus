@@ -13,6 +13,10 @@ const MasterPetak = (() => {
     const allRph   = await window.db.getAllActive('rph');
     const allTpg   = await window.db.getAllActive('tpg');
     const allUsers = await window.db.getAllActive('users');
+    const allAP = await window.db.getAllActive('anak_petak');
+    const allTargetAP = await window.db.getAllActive('target_anak_petak');
+    const activeYear = (window.TargetModule && window.TargetModule.state) ? window.TargetModule.state.tahun : 2026;
+    const activeTargets = allTargetAP.filter(t => t.tahun === activeYear);
 
     // ── Isi dropdown filter RPH (hanya isi ulang isi opsinya, jaga value) ──
     const rphSel = document.getElementById('petak-filter-rph');
@@ -50,20 +54,37 @@ const MasterPetak = (() => {
     if (!tbody) return;
 
     if (pager.rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Belum ada data Petak</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-state">Belum ada data Petak</td></tr>`;
     } else {
-      tbody.innerHTML = pager.rows.map(row => {
+      let pageLuas = 0;
+      let pagePohon = 0;
+      let pageTarget = 0;
+
+      const rowsHtml = pager.rows.map(row => {
         const rph = allRph.find(r => r.id === row.rph_id);
         const tpg = allTpg.find(t => t.id === row.tpg_id);
         const mandor = allUsers.find(u => u.id === row.mandor_id);
+
+        // Calculate total target for the petak
+        const aps = allAP.filter(a => a.petak_id === row.id);
+        const apIds = aps.map(a => a.id);
+        const tars = activeTargets.filter(t => apIds.includes(t.anak_petak_id));
+        const totalTarget = tars.reduce((sum, t) => sum + (t.target_kg || 0), 0);
+        const targetVal = totalTarget > 0 ? `<strong>${totalTarget.toLocaleString('id-ID')} kg</strong>` : '—';
+
+        pageLuas += (row.luas_ha || 0);
+        pagePohon += (row.jumlah_pohon || 0);
+        pageTarget += totalTarget;
+
         return `<tr>
           <td><strong>${row.nomor}</strong></td>
           <td>${rph ? rph.nama : '—'}</td>
           <td>${tpg ? tpg.nama : '—'}</td>
           <td>${mandor ? mandor.nama_lengkap : '—'}</td>
           <td>${(row.luas_ha || 0).toFixed(2)} ha</td>
-          <td>${row.jumlah_pohon || 0}</td>
+          <td>${(row.jumlah_pohon || 0).toLocaleString('id-ID')}</td>
           <td style="color:var(--text-secondary)">${row.kelas_hutan || '—'}</td>
+          <td>${targetVal}</td>
           <td style="color:var(--text-secondary)">${row.keterangan || '—'}</td>
           <td>
             <div class="action-btns">
@@ -73,6 +94,42 @@ const MasterPetak = (() => {
           </td>
         </tr>`;
       }).join('');
+
+      // Calculate Grand Totals for all pages in this filter
+      let grandLuas = 0;
+      let grandPohon = 0;
+      let grandTarget = 0;
+
+      data.forEach(row => {
+        grandLuas += (row.luas_ha || 0);
+        grandPohon += (row.jumlah_pohon || 0);
+
+        const aps = allAP.filter(a => a.petak_id === row.id);
+        const apIds = aps.map(a => a.id);
+        const tars = activeTargets.filter(t => apIds.includes(t.anak_petak_id));
+        grandTarget += tars.reduce((sum, t) => sum + (t.target_kg || 0), 0);
+      });
+
+      const totalHtml = `
+        <tr style="background:rgba(255,255,255,.015);font-weight:bold;border-top:2px solid var(--border-color);">
+          <td colspan="4" style="text-align:right;padding-right:1rem;">TOTAL HALAMAN INI:</td>
+          <td>${pageLuas.toFixed(2)} ha</td>
+          <td>${pagePohon.toLocaleString('id-ID')}</td>
+          <td></td>
+          <td>${pageTarget > 0 ? pageTarget.toLocaleString('id-ID') + ' kg' : '—'}</td>
+          <td colspan="2"></td>
+        </tr>
+        <tr style="background:rgba(255,255,255,.03);font-weight:bold;border-top:1px solid var(--border-color);">
+          <td colspan="4" style="text-align:right;padding-right:1rem;color:var(--primary);">TOTAL KESELURUHAN (${data.length} Petak):</td>
+          <td style="color:var(--primary);">${grandLuas.toFixed(2)} ha</td>
+          <td style="color:var(--primary);">${grandPohon.toLocaleString('id-ID')}</td>
+          <td></td>
+          <td style="color:var(--primary);">${grandTarget > 0 ? grandTarget.toLocaleString('id-ID') + ' kg' : '—'}</td>
+          <td colspan="2"></td>
+        </tr>
+      `;
+
+      tbody.innerHTML = rowsHtml + totalHtml;
     }
 
     U().renderPagination(

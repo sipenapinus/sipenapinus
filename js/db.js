@@ -8,7 +8,7 @@
 class SipenaDB {
   constructor() {
     this.dbName    = 'sipena_lite_db';
-    this.dbVersion = 6;
+    this.dbVersion = 7;
     this.db        = null;
   }
 
@@ -175,6 +175,13 @@ class SipenaDB {
       const s = db.createObjectStore('target_penyadap', { keyPath: 'id' });
       s.createIndex('tahun',       'tahun',       { unique: false });
       s.createIndex('penyadap_id', 'penyadap_id', { unique: false });
+      s.createIndex('deleted_at',  'deleted_at',  { unique: false });
+    }
+
+    if (!db.objectStoreNames.contains('target_anak_petak')) {
+      const s = db.createObjectStore('target_anak_petak', { keyPath: 'id' });
+      s.createIndex('tahun',       'tahun',       { unique: false });
+      s.createIndex('anak_petak_id','anak_petak_id',{ unique: false });
       s.createIndex('deleted_at',  'deleted_at',  { unique: false });
     }
 
