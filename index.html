@@ -7,7 +7,7 @@
   <title>SIPENA Pinus — Sistem Informasi Pengelolaan Penyadapan Pinus</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#101c15">
-  <link rel="stylesheet" href="css/styles.css?v=6">
+  <link rel="stylesheet" href="css/styles.css?v=10">
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
   <!-- SheetJS for Excel import/export -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -856,6 +856,9 @@
                   <option value="realisasi">🛢️ Laporan Realisasi Produksi</option>
                   <option value="kehadiran">👷 Laporan Kehadiran Penyadap</option>
                   <option value="pantauan">📋 Buku Mandor Sadap (Pantauan Kegiatan)</option>
+                  <option value="pantauan_tpg">🏭 Buku Mandor TPG (Penerimaan Getah)</option>
+                  <option value="buku_krph">🌲 Buku KRPH (Realisasi Per RPH)</option>
+                  <option value="buku_bkph">📊 Buku Asper/KBKPH (Realisasi Per BKPH)</option>
                 </select>
               </div>
               <div class="form-group" style="flex:1;min-width:180px;">
@@ -979,7 +982,7 @@
             </div>
 
             <!-- Tabel Laporan -->
-            <div class="table-container" style="border:1px solid #ddd;border-radius:4px;overflow:hidden;">
+            <div class="table-container" style="border:1px solid #ddd;border-radius:4px;overflow-x:auto;">
               <table class="report-table" style="width:100%;border-collapse:collapse;color:#111;font-size:.85rem;">
                 <thead id="rpt-table-head">
                   <!-- Will be dynamically generated -->
@@ -993,7 +996,17 @@
               </table>
             </div>
 
+            <!-- Rekap Akumulasi Kehadiran (muncul otomatis di bawah laporan kehadiran) -->
+            <div id="rpt-rekap-kehadiran" style="display:none; margin-top:1rem;"></div>
+
+            <!-- Ringkasan Master Data TPG/RPH -->
+            <div id="rpt-summary-master" style="display:none; margin-top:1rem; padding:12px 18px; font-size:0.85rem; background:#e8f5e9; border:1px solid #c8e6c9; border-radius:6px; color:#1b4d3e; line-height:1.6;"></div>
+
+            <!-- Legenda Buku Sadapan -->
+            <div id="rpt-legend-pantauan" style="display:none; margin-top:1rem; padding:10px 15px; font-size:0.8rem; background:#f9fbf9; border:1px solid #c8e6c9; border-radius:4px; color:#2e7d32; line-height:1.6;"></div>
+
             <!-- Tanda Tangan Mandor/Asper -->
+
             <div
               style="margin-top:3rem;display:flex;justify-content:space-between;padding:0 2rem;font-size:.85rem;color:#111;">
               <div style="text-align:center;">
@@ -2041,17 +2054,17 @@
   <script src="js/modules/master-rph.js?v=5"></script>
   <script src="js/modules/master-tpg.js?v=5"></script>
   <script src="js/modules/master-petak.js?v=8"></script>
-  <script src="js/modules/master-penyadap.js?v=5"></script>
-  <script src="js/modules/master-penugasan.js?v=5"></script>
+  <script src="js/modules/master-penyadap.js?v=6"></script>
+  <script src="js/modules/master-penugasan.js?v=6"></script>
   <script src="js/modules/master-anak-petak.js?v=5"></script>
   <script src="js/modules/master-user.js?v=9"></script>
   <script src="js/modules/master-import.js?v=9"></script>
   <script src="js/modules/target.js?v=7"></script>
-  <script src="js/modules/realisasi.js?v=4"></script>
-  <script src="js/modules/dashboard.js?v=25"></script>
+  <script src="js/modules/realisasi.js?v=6"></script>
+  <script src="js/modules/dashboard.js?v=28"></script>
   <script src="js/modules/master.js?v=6"></script>
-  <script src="js/modules/laporan.js?v=16"></script>
-  <script src="js/app.js?v=13"></script>
+  <script src="js/modules/laporan.js?v=40"></script>
+  <script src="js/app.js?v=19"></script>
 </body>
 
 </html>
