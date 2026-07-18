@@ -15,7 +15,17 @@ const MasterPenugasan = (() => {
     const allAP       = await window.db.getAllActive('anak_petak');
     const allPetak    = await window.db.getAllActive('petak');
 
+    const user = window.app && window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : '';
+
     let data = allPgn;
+
+    if ((role === 'mandor' || role === 'tpg') && scope) {
+      const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
+      data = data.filter(pg => apIds.includes(pg.anak_petak_id));
+    }
+
     if (state.filterAktif !== '') {
       const v = parseInt(state.filterAktif);
       data = data.filter(r => r.aktif === v);
@@ -63,8 +73,29 @@ const MasterPenugasan = (() => {
     const sel = document.getElementById(selId);
     if (!sel) return;
     const all = await window.db.getAllActive('penyadap_master');
+
+    const user = window.app && window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : '';
+    let filtered = all;
+
+    if ((role === 'mandor' || role === 'tpg') && scope) {
+      const allPgn = await window.db.getAllActive('penugasan');
+      const allAP = await window.db.getAllActive('anak_petak');
+      const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
+      
+      const assignedInScope = allPgn.filter(pg => apIds.includes(pg.anak_petak_id)).map(pg => pg.penyadap_id);
+      const allAssigned = new Set(allPgn.map(pg => pg.penyadap_id));
+
+      filtered = all.filter(p => 
+        assignedInScope.includes(p.id) || 
+        !allAssigned.has(p.id) || 
+        p.created_by === user.id
+      );
+    }
+
     sel.innerHTML = `<option value="">— Pilih Penyadap —</option>` +
-      all.map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${p.nomor} — ${p.nama} (${p.status})</option>`).join('');
+      filtered.map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${p.nomor} — ${p.nama} (${p.status})</option>`).join('');
   }
 
   let cachedAnakPetak = [];

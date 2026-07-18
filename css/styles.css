@@ -706,13 +706,22 @@ code {
 }
 .report-table th, .report-table td {
   border: 1px solid var(--border-color);
-  padding: 10px 12px;
+  padding: 6px 6px !important;
   text-align: left;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
 }
 .report-table th {
   background-color: var(--bg-surface-elevated);
   font-weight: 600;
   color: var(--text-primary);
+  text-transform: none !important;
+  white-space: normal !important;
+  text-align: center !important;
+}
+.report-table th.col-date, .report-table td.col-date {
+  padding: 4px 0px !important;
+  text-align: center !important;
 }
 .print-container {
   border: 1px solid var(--border-color);
@@ -819,7 +828,7 @@ code {
     width: 100% !important;
     border-collapse: collapse !important;
     margin-top: 8px !important;
-    table-layout: fixed !important;
+    table-layout: auto !important;
   }
   .report-table th, .report-table td {
     border: 1px solid #333 !important;
@@ -838,6 +847,13 @@ code {
     vertical-align: middle !important;
     text-align: center !important;
     font-weight: 700 !important;
+    text-transform: none !important;
+    white-space: normal !important;
+  }
+  .report-table th.col-date, .report-table td.col-date {
+    padding: 2px 0px !important;
+    text-align: center !important;
+    font-size: 5.5pt !important;
   }
   /* Footer total row */
   .report-table tr.total-row td {

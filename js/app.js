@@ -144,6 +144,9 @@ class SipenaApp {
       
       // Data Migration: Pastikan semua user mandor/tpg memiliki scope yang benar
       await this._migrateUserScopes();
+
+      // Data Migration: Perbaiki realisasi dengan tpg_id null
+      await this._migrateRealisasiTpgId();
     } catch (err) {
       this.showToast('Gagal memuat database lokal: ' + err.message, 'danger');
     }
@@ -385,46 +388,115 @@ class SipenaApp {
         mandorUser.scope = 'tpg-01';
         mandorUser.nama_lengkap = mandorUser.nama_lengkap || 'Mardi';
         await window.db.put('users', mandorUser);
-        console.log('[Migration] Set scope tpg-01 for usr-mandor');
       }
       // Patch usr-tpg (Mardi TPG) → scope: tpg-01 jika ada
       const tpgUser = await window.db.get('users', 'usr-tpg');
       if (tpgUser && !tpgUser.scope) {
         tpgUser.scope = 'tpg-01';
         await window.db.put('users', tpgUser);
-        console.log('[Migration] Set scope tpg-01 for usr-tpg');
       }
     } catch (e) {
       console.warn('[Migration] _migrateUserScopes skipped:', e.message);
     }
   }
 
-  /**
-   * Seeds default tables with mock data and hashed credentials.
-   */
-  async seedDatabaseIfEmpty() {
-    const existingUsers = await window.db.getAll('users');
-    if (existingUsers.length > 0) return;
+  async _migrateRealisasiTpgId() {
+    try {
+      const allReal = await window.db.getAllActive('realisasi');
+      const badReals = allReal.filter(r => !r.tpg_id || r.tpg_id === null || r.tpg_id === '');
+      if (badReals.length === 0) return;
 
-    console.log('[Seeding] Initializing database seeds from seed-data.js...');
+      const allPgn = await window.db.getAllActive('penugasan');
+      const allAP = await window.db.getAllActive('anak_petak');
 
-    if (window.SIPENA_SEED_DATA) {
-      const stores = [
-        'meta', 'users', 'bkph', 'rph', 'tpg', 'petak', 'anak_petak',
-        'penyadap_master', 'penugasan', 'ro', 'realisasi', 'kehadiran',
-        'monitoring', 'areal_sadap', 'penyadap',
-        'target_bkph', 'target_rph', 'target_tpg', 'target_mandor',
-        'target_penyadap', 'target_anak_petak'
-      ];
-      for (const store of stores) {
-        const items = window.SIPENA_SEED_DATA[store];
-        if (Array.isArray(items) && items.length > 0) {
-          await window.db.putMany(store, items);
+      let fixed = 0;
+      for (const r of badReals) {
+        const pgn = allPgn.find(pg => pg.penyadap_id === r.penyadap_id && pg.aktif === 1);
+        if (!pgn) continue;
+
+        const ap = allAP.find(a => a.id === pgn.anak_petak_id);
+        if (ap && ap.tpg_id) {
+          r.tpg_id = ap.tpg_id;
+          r.updated_at = new Date().toISOString();
+          r.updated_by = 'system_migration';
+          await window.db.put('realisasi', r);
+          fixed++;
         }
       }
-      console.log('[Seeding] Done seeding database from custom seed-data.js.');
+      if (fixed > 0) { /* migration realisasi tpg_id fixed */ }
+    } catch (e) {
+      console.warn('[Migration] _migrateRealisasiTpgId skipped:', e.message);
+    }
+  }
+
+  async seedDatabaseIfEmpty() {
+    const SEED_VERSION = 'seed-v4'; // Naikkan versi ini setiap kali seed-data.js diperbarui
+
+    if (window.SIPENA_SEED_DATA) {
+      const existingUsers = await window.db.getAll('users');
+
+      if (existingUsers.length === 0) {
+        // === Database kosong: seed penuh ===
+        console.log('[Seeding] Database kosong, melakukan seed penuh...');
+        const stores = [
+          'meta', 'users', 'bkph', 'rph', 'tpg', 'petak', 'anak_petak',
+          'penyadap_master', 'penugasan', 'ro', 'realisasi', 'kehadiran',
+          'monitoring', 'areal_sadap', 'penyadap',
+          'target_bkph', 'target_rph', 'target_tpg', 'target_mandor',
+          'target_penyadap', 'target_anak_petak'
+        ];
+        for (const store of stores) {
+          const items = window.SIPENA_SEED_DATA[store];
+          if (Array.isArray(items) && items.length > 0) {
+            await window.db.putMany(store, items);
+          }
+        }
+        /* seed penuh selesai */
+      } else {
+        // === Database sudah ada: cek versi seed, patch user yang hilang ===
+        const currentSeedMeta = await window.db.get('meta', 'seed_version');
+        if (currentSeedMeta && currentSeedMeta.value === SEED_VERSION) {
+          // Sudah versi terbaru, tidak perlu patch
+          return;
+        }
+
+        console.log('[Seeding] Versi seed baru terdeteksi, memeriksa user yang hilang...');
+        const existingUserIds = new Set(existingUsers.map(u => u.id));
+        const seedUsers = window.SIPENA_SEED_DATA['users'] || [];
+        let patchCount = 0;
+
+        for (const seedUser of seedUsers) {
+          if (!existingUserIds.has(seedUser.id)) {
+            await window.db.put('users', seedUser);
+            patchCount++;
+          } else {
+            // Force reset angga to active status and default seed password
+            if (seedUser.username === 'angga') {
+              const u = await window.db.get('users', seedUser.id);
+              if (u) {
+                u.deleted_at = null;
+                u.status = 'aktif';
+                u.password_hash = seedUser.password_hash;
+                await window.db.put('users', u);
+                console.log('[Seeding] Restored/reset user angga from seed data');
+              }
+            }
+          }
+        }
+
+        if (patchCount > 0) {
+          /* patch selesai */
+        }
+      }
+
+      // Tandai versi seed terbaru
+      await window.db.put('meta', { key: 'seed_version', value: SEED_VERSION });
     } else {
-      console.warn('[Seeding] Warning: window.SIPENA_SEED_DATA not found. Seeding fallback admin user...');
+      // Fallback jika seed-data.js tidak termuat
+      const existingUsers = await window.db.getAll('users');
+      if (existingUsers.length > 0) return;
+
+      console.warn('[Seeding] seed-data.js tidak ditemukan. Membuat akun admin darurat...');
       const hashAdmin = await hashPassword('admin123');
       const auditBase = {
         created_at: new Date().toISOString(),
@@ -435,10 +507,10 @@ class SipenaApp {
       };
       const adminUser = { id: 'usr-admin', username: 'admin', password_hash: hashAdmin, role: 'admin', nama_lengkap: 'Budi Santoso', nip: '198104122005011002', scope: null, status: 'aktif', ...auditBase };
       await window.db.put('users', adminUser);
-      console.log('[Seeding] Created fallback admin user.');
+      console.log('[Seeding] Akun admin darurat berhasil dibuat.');
     }
 
-    // Ensure metadata
+    // Pastikan metadata dasar tersedia
     const hasMetaLastSync = await window.db.get('meta', 'last_sync');
     if (!hasMetaLastSync) await window.db.put('meta', { key: 'last_sync', value: Date.now() });
     const hasMetaAppVersion = await window.db.get('meta', 'app_version');
@@ -626,7 +698,7 @@ class SipenaApp {
   // --- Page Data Loaders ---
 
   async loadDashboardData() {
-    console.log('Loading Dashboard Data...');
+
     
     // Inisialisasi Modul Dashboard Hierarki
     if (window.DashboardModule) {
@@ -670,7 +742,7 @@ class SipenaApp {
   }
 
   async loadMasterData() {
-    console.log('Loading Master Data...');
+
     const penyadap = await window.db.getAll('penyadap');
     const areas = await window.db.getAll('areal_sadap');
 
@@ -702,7 +774,7 @@ class SipenaApp {
   }
 
   async loadTargetROData() {
-    console.log('Loading Target & RO Data...');
+
     const user = this.currentUser;
     const role = user ? user.role : '';
     const scopeTpgId = user ? user.scope : '';
@@ -781,7 +853,7 @@ class SipenaApp {
   }
 
   async loadRealisasiData() {
-    console.log('Loading Realisasi Data via RealisasiModule...');
+
     if (window.RealisasiModule) {
       await window.RealisasiModule.render();
     }

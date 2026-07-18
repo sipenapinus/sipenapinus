@@ -231,31 +231,36 @@ const DashboardModule = (() => {
     )];
   }
 
+  const IZIN_STATUSES = ['izin_pertanian','izin_bangunan','izin_hajatan','izin_lainnya','izin'];
+
   function _buildKehadiranSummary(penyadapIds, todayStr, allKehadiran) {
     if (!penyadapIds || penyadapIds.length === 0)
-      return { total:0, aktif:0, hadir:0, pemb1:0, pemb2:0, pemb3:0, pengecasan:0, ludang:0, sakit:0, izin:0, tidakHadir:0, belumCde:0 };
+      return { total:0, aktif:0, hadir:0, pemb1:0, pemb2:0, pemb3:0, pengecasan:0, ludang:0, sakit:0, izin:0, izinPertanian:0, izinBangunan:0, izinHajatan:0, izinLainnya:0, tidakHadir:0, belumCde:0 };
     const khds = allKehadiran.filter(k => k.tanggal === todayStr && penyadapIds.includes(k.penyadap_id));
     const AKTIF = ['hadir','pembaharuan_1','pembaharuan_2','pembaharuan_3','pengecasan','ludang'];
     return {
-      total:      penyadapIds.length,
-      aktif:      khds.filter(k => AKTIF.includes(k.status)).length,
-      hadir:      khds.filter(k => k.status === 'hadir').length,
-      pemb1:      khds.filter(k => k.status === 'pembaharuan_1').length,
-      pemb2:      khds.filter(k => k.status === 'pembaharuan_2').length,
-      pemb3:      khds.filter(k => k.status === 'pembaharuan_3').length,
-      pengecasan: khds.filter(k => k.status === 'pengecasan').length,
-      ludang:     khds.filter(k => k.status === 'ludang').length,
-      sakit:      khds.filter(k => k.status === 'sakit').length,
-      izin:       khds.filter(k => k.status === 'izin').length,
-      tidakHadir: khds.filter(k => k.status === 'tidak_hadir').length,
-      belumCde:   Math.max(0, penyadapIds.length - khds.length)
+      total:         penyadapIds.length,
+      aktif:         khds.filter(k => AKTIF.includes(k.status)).length,
+      hadir:         khds.filter(k => k.status === 'hadir').length,
+      pemb1:         khds.filter(k => k.status === 'pembaharuan_1').length,
+      pemb2:         khds.filter(k => k.status === 'pembaharuan_2').length,
+      pemb3:         khds.filter(k => k.status === 'pembaharuan_3').length,
+      pengecasan:    khds.filter(k => k.status === 'pengecasan').length,
+      ludang:        khds.filter(k => k.status === 'ludang').length,
+      sakit:         khds.filter(k => k.status === 'sakit').length,
+      izin:          khds.filter(k => IZIN_STATUSES.includes(k.status)).length,
+      izinPertanian: khds.filter(k => k.status === 'izin_pertanian').length,
+      izinBangunan:  khds.filter(k => k.status === 'izin_bangunan').length,
+      izinHajatan:   khds.filter(k => k.status === 'izin_hajatan').length,
+      izinLainnya:   khds.filter(k => k.status === 'izin_lainnya').length,
+      tidakHadir:    khds.filter(k => k.status === 'tidak_hadir').length,
+      belumCde:      Math.max(0, penyadapIds.length - khds.length)
     };
   }
 
   function _buildKehadiranCardHtml(s) {
     if (s.total === 0) return '';
     const det = [
-      s.hadir      > 0 ? `└ Hadir: <b>${s.hadir}</b>`           : null,
       s.pemb1      > 0 ? `└ Pemb.1: <b>${s.pemb1}</b>`          : null,
       s.pemb2      > 0 ? `└ Pemb.2: <b>${s.pemb2}</b>`          : null,
       s.pemb3      > 0 ? `└ Pemb.3: <b>${s.pemb3}</b>`          : null,
@@ -266,9 +271,13 @@ const DashboardModule = (() => {
       <div style="font-size:.7rem;color:var(--text-secondary);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">👷 Kehadiran Hari Ini</div>
       <div style="display:flex;justify-content:space-between;"><span style="color:var(--primary);font-weight:600;">✅ Aktif Kerja</span><strong style="color:var(--primary);">${s.aktif} / ${s.total}</strong></div>
       ${det.length > 0 ? `<div style="padding-left:.4rem;color:var(--text-secondary);font-size:.71rem;display:flex;flex-wrap:wrap;gap:.1rem .5rem;">${det.map(d => `<span>${d}</span>`).join('')}</div>` : ''}
-      ${s.sakit      > 0 ? `<div style="display:flex;justify-content:space-between;"><span>🟡 Sakit</span><strong style="color:var(--warning);">${s.sakit}</strong></div>` : ''}
-      ${s.izin       > 0 ? `<div style="display:flex;justify-content:space-between;"><span>⚪ Izin</span><strong style="color:var(--text-secondary);">${s.izin}</strong></div>` : ''}
-      ${s.tidakHadir > 0 ? `<div style="display:flex;justify-content:space-between;"><span>🔴 Tidak Hadir</span><strong style="color:var(--danger);">${s.tidakHadir}</strong></div>` : ''}
+      ${s.sakit         > 0 ? `<div style="display:flex;justify-content:space-between;"><span>🟡 Sakit</span><strong style="color:var(--warning);">${s.sakit}</strong></div>` : ''}
+      ${s.izin          > 0 ? `<div style="display:flex;justify-content:space-between;"><span>⚪ Izin (${s.izin})</span><strong style="color:var(--text-secondary);"></strong></div>` : ''}
+      ${s.izinPertanian > 0 ? `<div style="display:flex;justify-content:space-between;padding-left:.75rem;font-size:.75rem;"><span>↳ Pertanian</span><strong style="color:var(--text-secondary);">${s.izinPertanian}</strong></div>` : ''}
+      ${s.izinBangunan  > 0 ? `<div style="display:flex;justify-content:space-between;padding-left:.75rem;font-size:.75rem;"><span>↳ Bangunan</span><strong style="color:var(--text-secondary);">${s.izinBangunan}</strong></div>` : ''}
+      ${s.izinHajatan   > 0 ? `<div style="display:flex;justify-content:space-between;padding-left:.75rem;font-size:.75rem;"><span>↳ Hajatan</span><strong style="color:var(--text-secondary);">${s.izinHajatan}</strong></div>` : ''}
+      ${s.izinLainnya   > 0 ? `<div style="display:flex;justify-content:space-between;padding-left:.75rem;font-size:.75rem;"><span>↳ Lainnya</span><strong style="color:var(--text-secondary);">${s.izinLainnya}</strong></div>` : ''}
+      ${s.tidakHadir    > 0 ? `<div style="display:flex;justify-content:space-between;"><span>🔴 Tidak Hadir</span><strong style="color:var(--danger);">${s.tidakHadir}</strong></div>` : ''}
       <div style="display:flex;justify-content:space-between;"><span>⏳ Belum di CDE</span><strong>${s.belumCde}</strong></div>
     </div>`;
   }
@@ -279,7 +288,7 @@ const DashboardModule = (() => {
       <div style="font-size:.72rem;color:var(--text-secondary);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">👷 Ringkasan Kehadiran Penyadap Hari Ini &nbsp;<span style="font-weight:400;">(Total Penyadap: ${s.total})</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:.35rem 1.25rem;font-size:.8rem;align-items:baseline;">
         <span style="color:var(--primary);font-weight:700;">✅ Aktif: ${s.aktif}</span>
-        <span style="color:var(--text-secondary);font-size:.72rem;">(Hadir:${s.hadir} | Pemb.1:${s.pemb1} | Pemb.2:${s.pemb2} | Pemb.3:${s.pemb3} | Pengecasan:${s.pengecasan} | Ludang:${s.ludang})</span>
+        <span style="color:var(--text-secondary);font-size:.72rem;">(Pemb.1:${s.pemb1} | Pemb.2:${s.pemb2} | Pemb.3:${s.pemb3} | Pengecasan:${s.pengecasan} | Ludang:${s.ludang})</span>
         <span style="color:var(--warning);font-weight:600;">🟡 Sakit: ${s.sakit}</span>
         <span style="color:var(--text-secondary);">⚪ Izin: ${s.izin}</span>
         <span style="color:var(--danger);font-weight:600;">🔴 Alpa: ${s.tidakHadir}</span>
@@ -849,10 +858,14 @@ const DashboardModule = (() => {
     const countPemb3        = pndKehadiranToday.filter(k => k.status === 'pembaharuan_3').length;
     const countPengecasan   = pndKehadiranToday.filter(k => k.status === 'pengecasan').length;
     const countLudang       = pndKehadiranToday.filter(k => k.status === 'ludang').length;
-    const countSakit        = pndKehadiranToday.filter(k => k.status === 'sakit').length;
-    const countIzin         = pndKehadiranToday.filter(k => k.status === 'izin').length;
-    const countTidakHadir   = pndKehadiranToday.filter(k => k.status === 'tidak_hadir').length;
-    const countBelumDicek   = Math.max(0, activePndIds.length - pndKehadiranToday.length);
+    const countSakit          = pndKehadiranToday.filter(k => k.status === 'sakit').length;
+    const countIzin           = pndKehadiranToday.filter(k => IZIN_STATUSES.includes(k.status)).length;
+    const countIzinPertanian  = pndKehadiranToday.filter(k => k.status === 'izin_pertanian').length;
+    const countIzinBangunan   = pndKehadiranToday.filter(k => k.status === 'izin_bangunan').length;
+    const countIzinHajatan    = pndKehadiranToday.filter(k => k.status === 'izin_hajatan').length;
+    const countIzinLainnya    = pndKehadiranToday.filter(k => k.status === 'izin_lainnya').length;
+    const countTidakHadir     = pndKehadiranToday.filter(k => k.status === 'tidak_hadir').length;
+    const countBelumDicek     = Math.max(0, activePndIds.length - pndKehadiranToday.length);
 
     // Setor getah
     const countSudahSetor = [...new Set(realPeriodeList.map(rl => rl.penyadap_id))].length;
@@ -931,7 +944,13 @@ const DashboardModule = (() => {
               <div style="display:flex;justify-content:space-between;padding-left:.5rem;"><span style="color:var(--text-secondary);">└ Pengecasan/Stimulasi</span><strong style="color:var(--primary);">${countPengecasan}</strong></div>
               <div style="display:flex;justify-content:space-between;padding-left:.5rem;margin-bottom:.25rem;"><span style="color:var(--text-secondary);">└ Ludang</span><strong style="color:var(--primary);">${countLudang}</strong></div>
               <div style="display:flex;justify-content:space-between;"><span>🟡 Sakit</span><strong style="color:var(--warning);">${countSakit}</strong></div>
-              <div style="display:flex;justify-content:space-between;"><span>⚪ Izin</span><strong style="color:var(--text-secondary);">${countIzin}</strong></div>
+              ${countIzin > 0 ? `
+              <div style="display:flex;justify-content:space-between;"><span>⚪ Izin (${countIzin})</span><strong style="color:var(--text-secondary);"></strong></div>
+              ${countIzinPertanian > 0 ? `<div style="display:flex;justify-content:space-between;padding-left:.75rem;font-size:.78rem;"><span style="color:var(--text-secondary);">↳ Pertanian</span><strong style="color:var(--text-secondary);">${countIzinPertanian}</strong></div>` : ''}
+              ${countIzinBangunan  > 0 ? `<div style="display:flex;justify-content:space-between;padding-left:.75rem;font-size:.78rem;"><span style="color:var(--text-secondary);">↳ Bangunan</span><strong style="color:var(--text-secondary);">${countIzinBangunan}</strong></div>` : ''}
+              ${countIzinHajatan   > 0 ? `<div style="display:flex;justify-content:space-between;padding-left:.75rem;font-size:.78rem;"><span style="color:var(--text-secondary);">↳ Hajatan</span><strong style="color:var(--text-secondary);">${countIzinHajatan}</strong></div>` : ''}
+              ${countIzinLainnya   > 0 ? `<div style="display:flex;justify-content:space-between;padding-left:.75rem;font-size:.78rem;"><span style="color:var(--text-secondary);">↳ Lainnya</span><strong style="color:var(--text-secondary);">${countIzinLainnya}</strong></div>` : ''}
+              ` : '<div style="display:flex;justify-content:space-between;"><span>⚪ Izin</span><strong style="color:var(--text-secondary);">0</strong></div>'}
               <div style="display:flex;justify-content:space-between;"><span>🔴 Tidak Hadir</span><strong style="color:var(--danger);">${countTidakHadir}</strong></div>
               <div style="display:flex;justify-content:space-between;"><span>⏳ Belum di CDE</span><strong>${countBelumDicek}</strong></div>
             </div>
@@ -1246,24 +1265,28 @@ const DashboardModule = (() => {
 
   function _renderAttendanceList(tbody, penyadaps, selectedDate, allKehadiran) {
     const options = [
-      { val: 'hadir',         label: '🟢 Hadir' },
-      { val: 'pembaharuan_1', label: '🟢 Pembaharuan 1' },
-      { val: 'pembaharuan_2', label: '🟢 Pembaharuan 2' },
-      { val: 'pembaharuan_3', label: '🟢 Pembaharuan 3' },
-      { val: 'pengecasan',    label: '🟢 Pengecasan/Stimulasi' },
-      { val: 'ludang',        label: '🟢 Ludang' },
-      { val: 'sakit',        label: '🟡 Sakit' },
-      { val: 'izin',         label: '⚪ Izin' },
-      { val: 'tidak_hadir',  label: '🔴 Alpa' }
+      { val: '',               label: '— (Tidak Ada Kegiatan Khusus)' },
+      { val: 'pembaharuan_1',  label: '🟢 Pembaharuan 1' },
+      { val: 'pembaharuan_2',  label: '🟢 Pembaharuan 2' },
+      { val: 'pembaharuan_3',  label: '🟢 Pembaharuan 3' },
+      { val: 'pengecasan',     label: '🟢 Pengecasan/Stimulasi' },
+      { val: 'ludang',         label: '🟢 Ludang' },
+      { val: 'sakit',          label: '🟡 Sakit' },
+      { val: 'izin_pertanian', label: '⚪ Izin — Pertanian' },
+      { val: 'izin_bangunan',  label: '⚪ Izin — Bangunan' },
+      { val: 'izin_hajatan',   label: '⚪ Izin — Hajatan' },
+      { val: 'izin_lainnya',   label: '⚪ Izin — Lainnya' },
+      { val: 'tidak_hadir',    label: '🔴 Alpa' }
     ];
 
     tbody.innerHTML = penyadaps.map(p => {
       // Cari status absen jika sudah dicatat sebelumnya untuk tanggal terpilih
       const khd = allKehadiran.find(k => k.tanggal === selectedDate && k.penyadap_id === p.id);
-      const activeStatus = khd ? khd.status : 'hadir'; // default 'hadir'
+      // Kalau belum ada catatan atau statusnya 'hadir' lama → default ke '' (kosong)
+      const activeStatus = khd ? (khd.status === 'hadir' ? '' : khd.status) : '';
 
       const selectsHtml = `
-        <select class="form-control attendance-status-select" data-penyadap-id="${p.id}" style="margin:0; max-width:180px;">
+        <select class="form-control attendance-status-select" data-penyadap-id="${p.id}" style="margin:0; max-width:210px;">
           ${options.map(opt => `<option value="${opt.val}" ${opt.val === activeStatus ? 'selected' : ''}>${opt.label}</option>`).join('')}
         </select>
       `;
@@ -1352,6 +1375,16 @@ const DashboardModule = (() => {
     for (const select of selects) {
       const penyadap_id = select.dataset.penyadapId;
       const status = select.value;
+
+      // Skip jika tidak ada kegiatan dipilih (status kosong = tidak ada catatan = '—' di buku)
+      if (!status) {
+        // Hapus record lama jika ada (agar kembali ke '—')
+        const existing = allKehadiran.find(k => k.tanggal === todayStr && k.penyadap_id === penyadap_id);
+        if (existing) {
+          await window.db.delete('kehadiran', existing.id);
+        }
+        continue;
+      }
 
       // Cari record kehadiran lama untuk penyadap ini pada tanggal ini
       const existing = allKehadiran.find(k => k.tanggal === todayStr && k.penyadap_id === penyadap_id);

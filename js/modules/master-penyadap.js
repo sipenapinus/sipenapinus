@@ -13,6 +13,19 @@ const MasterPenyadap = (() => {
   async function render() {
     const all = await window.db.getAllActive('penyadap_master');
     let data  = all;
+
+    const user = window.app && window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : '';
+
+    if ((role === 'mandor' || role === 'tpg') && scope) {
+      const allPgn = await window.db.getAllActive('penugasan');
+      const allAP = await window.db.getAllActive('anak_petak');
+      const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
+      const assignedPndIds = allPgn.filter(pg => apIds.includes(pg.anak_petak_id)).map(pg => pg.penyadap_id);
+      data = all.filter(p => assignedPndIds.includes(p.id) || p.created_by === user.id);
+    }
+
     if (state.filterStatus) data = data.filter(r => r.status === state.filterStatus);
     data = U().filterAndSort(data, state.search, ['nomor', 'nama', 'alamat', 'no_hp'], state.sortKey, state.sortDir);
 

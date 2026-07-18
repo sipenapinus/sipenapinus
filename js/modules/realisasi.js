@@ -130,20 +130,16 @@ const RealisasiModule = (() => {
     const period = day <= 15 ? 1 : 2;
 
     const allRO = await window.db.getAllActive('ro');
-    console.log('[DEBUG RO] allRO:', allRO);
-    console.log('[DEBUG RO] Searching for:', { year, month, period, penyadapId });
     
     const matchingRO = allRO.find(ro => {
       const matchTahun = parseInt(ro.tahun) === parseInt(year);
       const matchBulan = parseInt(ro.bulan) === parseInt(month);
       const matchPeriode = parseInt(ro.periode) === parseInt(period);
       const matchPenyadap = ro.penyadap_id === penyadapId;
-      console.log(`[DEBUG RO] Comparing item:`, ro, { matchTahun, matchBulan, matchPeriode, matchPenyadap });
       return matchTahun && matchBulan && matchPeriode && matchPenyadap;
     });
 
     const target = matchingRO ? (matchingRO.kesanggupan || 0) : 0;
-    console.log('[DEBUG RO] Result target:', target);
     elHelper.value = target + ' kg';
   }
 
@@ -255,7 +251,7 @@ const RealisasiModule = (() => {
   async function _renderSummary(data, allRO) {
     // Calculate total RO hierarchically within filterBulan scope
     const filteredROs = await _getFilteredROs(allRO, state.filterBulan);
-    console.log('DEBUG_REALISASI_ROS_DETAILS:', filteredROs.map(ro => `${ro.id}:${ro.penyadap_id}:P${ro.periode}:${ro.kesanggupan}kg`));
+
     const totalRO = filteredROs.reduce((sum, ro) => sum + (ro.kesanggupan || 0), 0);
 
     const totalBersih = data.reduce((s, r) => s + (r.berat_bersih || 0), 0);
@@ -468,7 +464,20 @@ const RealisasiModule = (() => {
     if (beratBersih <= 0) { U().showToast('Berat bersih harus diisi', 'danger'); return; }
 
     const user  = window.app.currentUser;
-    const tpgId = user ? user.scope : null;
+    let tpgId = user ? user.scope : null;
+
+    // Fallback: If tpgId is not set, resolve it from the selected penyadap's active penugasan
+    if (!tpgId) {
+      const allPgn = await window.db.getAllActive('penugasan');
+      const pgn = allPgn.find(pg => pg.penyadap_id === penyadapId && pg.aktif === 1);
+      if (pgn) {
+        const allAP = await window.db.getAllActive('anak_petak');
+        const ap = allAP.find(a => a.id === pgn.anak_petak_id);
+        if (ap) {
+          tpgId = ap.tpg_id;
+        }
+      }
+    }
 
     const record = {
       id,
