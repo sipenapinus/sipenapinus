@@ -93,6 +93,14 @@ const TargetModule = (() => {
       state.subTab = 'bkph';
     }
 
+    // Pasang listener untuk deteksi perubahan Penyadap di modal
+    const pndSelect = document.getElementById('target-pnd-select');
+    if (pndSelect) {
+      pndSelect.addEventListener('change', (e) => {
+        onPenyadapChange(e.target.value);
+      });
+    }
+
     renderSubTabs();
     render();
   }
@@ -150,8 +158,7 @@ const TargetModule = (() => {
 
     if (triggerBtn) {
       if (state.subTab === 'penyadap') {
-        triggerBtn.style.display = perm.write ? 'block' : 'none';
-        triggerBtn.textContent = '+ Target Penyadap';
+        triggerBtn.style.display = 'none'; // Sembunyikan karena input sudah 100% inline di tabel
       } else {
         triggerBtn.style.display = (perm.write && !perm.isMandor) ? 'block' : 'none';
         triggerBtn.textContent = `+ Target ${state.subTab.toUpperCase()}`;
@@ -638,13 +645,21 @@ const TargetModule = (() => {
       // 2. Render sub-rows for each Penyadap if assigned
       if (hasTappers) {
         group.tappers.forEach(tap => {
+          const luasEl = perm.write ? `
+            <input type="number" step="0.01" class="form-control target-luas-val" style="width:85px;display:inline-block;margin:0;"
+              value="${tap.luas_ha || ''}" placeholder="0"> ha
+          ` : `${tap.luas_ha || 0} ha`;
+
+          const pohonEl = perm.write ? `
+            <input type="number" class="form-control target-pohon-val" style="width:95px;display:inline-block;margin:0;"
+              value="${tap.pohon || ''}" placeholder="0"> pohon
+          ` : `${(tap.pohon || 0).toLocaleString('id-ID')} pohon`;
+
           const inputEl = perm.write ? `
-            <input type="number" class="form-control target-input-val petak-input-${petak.id}" style="width:120px;display:inline-block;margin:0;"
+            <input type="number" class="form-control target-input-val petak-input-${petak.id}" style="width:110px;display:inline-block;margin:0;"
               data-id="${tap.id}"
               data-pnd="${tap.penyadap_id}"
               data-ap="${tap.anak_petak_id}"
-              data-luas="${tap.luas_ha}"
-              data-pohon="${tap.pohon}"
               value="${tap.target_kg || ''}"
               placeholder="0"
               oninput="TargetModule.updateInlineTotal('${petak.id}', ${targetTpgVal})">
@@ -656,8 +671,8 @@ const TargetModule = (() => {
               <td style="padding-left:1.75rem;">
                 <span style="color:var(--text-secondary);font-size:0.88rem;">└─ 👤 <strong>${tap.psy.nama}</strong> <span style="font-size:0.8rem;color:var(--text-secondary);margin-left:0.3rem;">(${tap.psy.nomor})</span></span>
               </td>
-              <td style="color:var(--text-secondary);font-size:0.88rem;">${tap.luas_ha} ha</td>
-              <td style="color:var(--text-secondary);font-size:0.88rem;">${(tap.pohon || 0).toLocaleString('id-ID')} pohon</td>
+              <td>${luasEl}</td>
+              <td>${pohonEl}</td>
               <td style="color:var(--text-secondary);font-size:0.88rem;">—</td>
               <td>${inputEl}</td>
             </tr>
@@ -733,32 +748,108 @@ const TargetModule = (() => {
   async function _loadPenyadapSelect(selectId, selectedId = '') {
     const sel = document.getElementById(selectId);
     if (!sel) return;
+    
     const all = await window.db.getAllActive('penyadap_master');
-    sel.innerHTML = `<option value="">— Pilih Penyadap —</option>` +
-      all.map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${p.nomor} — ${p.nama}</option>`).join('');
-  }
+    const user = window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : null;
+    const perm = getPermissions();
 
-  async function _loadAnakPetakSelect(selectId, selectedId = '') {
-    const sel = document.getElementById(selectId);
-    if (!sel) return;
-    
-    const allAP    = await window.db.getAllActive('anak_petak');
-    const allPetak = await window.db.getAllActive('petak');
-    
-    // Jika Mandor yang input, batasi anak petak hanya yang ada di scope TPG Mandor tersebut
-    const role = window.app.currentUser.role;
-    const scope = window.app.currentUser.scope;
-    let filteredAP = allAP;
-    if ((role === 'mandor' || role === 'tpg') && scope) {
-      filteredAP = allAP.filter(ap => ap.tpg_id === scope);
+    let filtered = all;
+
+    if (perm.isMandor && scope) {
+      const allPgn = await window.db.getAllActive('penugasan');
+      const allAP = await window.db.getAllActive('anak_petak');
+      const allPetak = await window.db.getAllActive('petak');
+      
+      let myPetakIds = [];
+      if (role === 'mandor') {
+        myPetakIds = allPetak.filter(p => p.mandor_id === user.id).map(p => p.id);
+      } else {
+        myPetakIds = allPetak.filter(p => p.tpg_id === scope).map(p => p.id);
+      }
+      
+      const myApIds = allAP.filter(ap => myPetakIds.includes(ap.petak_id)).map(ap => ap.id);
+      const activePgnForMe = allPgn.filter(pg => pg.aktif === 1 && myApIds.includes(pg.anak_petak_id));
+      const activePndIds = new Set(activePgnForMe.map(pg => pg.penyadap_id));
+
+      filtered = all.filter(p => activePndIds.has(p.id));
     }
 
-    sel.innerHTML = `<option value="">— Pilih Petak —</option>` +
-      filteredAP.map(ap => {
-        const p = allPetak.find(x => x.id === ap.petak_id);
-        const label = p ? `Petak ${p.nomor} (${ap.luas_ha || 0} ha)` : ap.huruf;
-        return `<option value="${ap.id}" ${ap.id === selectedId ? 'selected' : ''}>${label}</option>`;
-      }).join('');
+    sel.innerHTML = `<option value="">— Pilih Penyadap —</option>` +
+      filtered.map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${p.nomor} — ${p.nama}</option>`).join('');
+  }
+
+  async function onPenyadapChange(penyadapId, selectedApId = '') {
+    const apSelect = document.getElementById('target-ap-select');
+    if (!apSelect) return;
+
+    if (!penyadapId) {
+      apSelect.innerHTML = `<option value="">— Pilih Petak —</option>`;
+      apSelect.disabled = false;
+      document.getElementById('target-luas-ha').value = '';
+      document.getElementById('target-pohon').value = '';
+      return;
+    }
+
+    const allPgn = await window.db.getAllActive('penugasan');
+    const allAP = await window.db.getAllActive('anak_petak');
+    const allPetak = await window.db.getAllActive('petak');
+
+    const user = window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : null;
+    const perm = getPermissions();
+
+    let myPetakIds = [];
+    if (perm.isMandor && scope) {
+      if (role === 'mandor') {
+        myPetakIds = allPetak.filter(p => p.mandor_id === user.id).map(p => p.id);
+      } else {
+        myPetakIds = allPetak.filter(p => p.tpg_id === scope).map(p => p.id);
+      }
+    } else {
+      myPetakIds = allPetak.map(p => p.id);
+    }
+
+    const myApIds = allAP.filter(ap => myPetakIds.includes(ap.petak_id)).map(ap => ap.id);
+    const activePgn = allPgn.filter(pg => pg.aktif === 1 && pg.penyadap_id === penyadapId && myApIds.includes(pg.anak_petak_id));
+
+    if (activePgn.length === 0) {
+      apSelect.innerHTML = `<option value="">— Tidak ada penugasan aktif —</option>`;
+      apSelect.disabled = true;
+      document.getElementById('target-luas-ha').value = '';
+      document.getElementById('target-pohon').value = '';
+      return;
+    }
+
+    apSelect.innerHTML = activePgn.map(pg => {
+      const ap = allAP.find(x => x.id === pg.anak_petak_id);
+      const p = ap ? allPetak.find(x => x.id === ap.petak_id) : null;
+      const label = p ? `Petak ${p.nomor} (${ap.luas_ha || 0} ha)` : (ap ? ap.huruf : '');
+      return `<option value="${pg.anak_petak_id}" ${pg.anak_petak_id === selectedApId ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+
+    const isEditMode = !!document.getElementById('target-item-id').value;
+
+    if (activePgn.length === 1) {
+      apSelect.value = activePgn[0].anak_petak_id;
+      apSelect.disabled = true;
+      
+      if (!isEditMode) {
+        const activeAp = allAP.find(x => x.id === activePgn[0].anak_petak_id);
+        document.getElementById('target-luas-ha').value = activeAp ? activeAp.luas_ha : '';
+        document.getElementById('target-pohon').value = activePgn[0].jumlah_pohon || '';
+      }
+    } else {
+      apSelect.disabled = false;
+      if (selectedApId) {
+        apSelect.value = selectedApId;
+      }
+      if (!isEditMode && !selectedApId) {
+        onAnakPetakChange(apSelect.value);
+      }
+    }
   }
 
   // ── Open Modals ─────────────────────────────────────────────
@@ -786,7 +877,11 @@ const TargetModule = (() => {
       penyadapGroup.style.display = 'block';
       document.getElementById('target-modal-title').textContent = 'Tambah Target Penyadap';
       await _loadPenyadapSelect('target-pnd-select');
-      await _loadAnakPetakSelect('target-ap-select');
+      const apSelect = document.getElementById('target-ap-select');
+      if (apSelect) {
+        apSelect.innerHTML = `<option value="">— Pilih Penyadap Dahulu —</option>`;
+        apSelect.disabled = true;
+      }
     } else {
       generalGroup.style.display = 'block';
       penyadapGroup.style.display = 'none';
@@ -827,7 +922,7 @@ const TargetModule = (() => {
       penyadapGroup.style.display = 'block';
       document.getElementById('target-modal-title').textContent = 'Edit Target Penyadap';
       await _loadPenyadapSelect('target-pnd-select', row.penyadap_id);
-      await _loadAnakPetakSelect('target-ap-select', row.anak_petak_id);
+      await onPenyadapChange(row.penyadap_id, row.anak_petak_id);
       document.getElementById('target-luas-ha').value = row.luas_ha;
       document.getElementById('target-pohon').value = row.pohon || '';
       document.getElementById('target-pnd-val-kg').value = row.target_kg;
@@ -854,7 +949,7 @@ const TargetModule = (() => {
     const id = document.getElementById('target-item-id').value || U().uuid();
     const tahun = parseInt(document.getElementById('target-tahun').value);
     const storeName = `target_${state.subTab}`;
-    const existing = await window.db.get(storeName, id);
+    let existing = await window.db.get(storeName, id);
 
     let record = { id, tahun };
 
@@ -882,8 +977,9 @@ const TargetModule = (() => {
       const allPnd = await window.db.getAllActive('target_penyadap');
       const dup = allPnd.find(x => x.tahun === tahun && x.penyadap_id === penyadap_id && x.anak_petak_id === anak_petak_id && x.id !== id);
       if (dup) {
-        U().showToast('Penyadap sudah memiliki target di Anak Petak ini pada tahun yang sama', 'danger');
-        return;
+        // Alih-alih memblokir, kita gunakan ID yang sudah ada untuk memperbarui datanya
+        record.id = dup.id;
+        existing = dup;
       }
 
       record = {
@@ -934,7 +1030,36 @@ const TargetModule = (() => {
       U().closeModal('target-modal');
       U().showToast(existing ? 'Target berhasil diperbarui' : 'Target berhasil ditambahkan', 'success');
       state.page = 1;
+
+      let petakIdToExpand = null;
+      if (state.subTab === 'penyadap') {
+        const allAP = await window.db.getAllActive('anak_petak');
+        const apObj = allAP.find(x => x.id === record.anak_petak_id);
+        if (apObj) petakIdToExpand = apObj.petak_id;
+      }
+
       await render();
+
+      if (petakIdToExpand) {
+        togglePetakRow(petakIdToExpand); // Perluas baris petak
+
+        // Tunggu sebentar agar elemen DOM benar-benar siap dan lakukan scroll/highlight
+        setTimeout(() => {
+          const inputEl = document.querySelector(`.petak-input-${petakIdToExpand}[data-pnd="${record.penyadap_id}"]`);
+          if (inputEl) {
+            inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            inputEl.focus();
+            const tr = inputEl.closest('tr');
+            if (tr) {
+              tr.style.backgroundColor = 'rgba(46, 204, 113, 0.2)'; // Highlight warna hijau/sukses
+              tr.style.transition = 'background-color 0.5s ease';
+              setTimeout(() => {
+                tr.style.backgroundColor = '';
+              }, 2000);
+            }
+          }
+        }, 100);
+      }
     } catch (e) {
       U().showToast('Gagal menyimpan target: ' + e.message, 'danger');
     }
@@ -1230,7 +1355,19 @@ const TargetModule = (() => {
       const elLuas = document.getElementById('target-luas-ha');
       const elPohon = document.getElementById('target-pohon');
       if (elLuas) elLuas.value = ap.luas_ha || '';
-      if (elPohon) elPohon.value = ap.jumlah_pohon || '';
+      
+      const pndId = document.getElementById('target-pnd-select').value;
+      if (pndId) {
+        const allPgn = await window.db.getAllActive('penugasan');
+        const pgn = allPgn.find(pg => pg.aktif === 1 && pg.penyadap_id === pndId && pg.anak_petak_id === apId);
+        if (pgn && elPohon) {
+          elPohon.value = pgn.jumlah_pohon || ap.jumlah_pohon || '';
+        } else if (elPohon) {
+          elPohon.value = ap.jumlah_pohon || '';
+        }
+      } else {
+        if (elPohon) elPohon.value = ap.jumlah_pohon || '';
+      }
     }
   }
 
@@ -1595,29 +1732,55 @@ const TargetModule = (() => {
       const apFirst = aps[0] || null;
       const apTargetRecord = apFirst ? apTargetList.find(t => t.anak_petak_id === apFirst.id) : null;
       const targetPetakVal = apTargetRecord ? (apTargetRecord.target_kg || 0) : 0;
+      const petakLuasLimit = petak.luas_ha || (apFirst ? apFirst.luas_ha : 0);
+      const petakPohonLimit = petak.jumlah_pohon || (apFirst ? apFirst.jumlah_pohon : 0);
 
-      // Sum all tapper inputs for this petak
-      const petakInputs = document.querySelectorAll(`.petak-input-${petak.id}`);
+      // Sum all tapper inputs for this petak from sub-rows
+      const childRows = document.querySelectorAll(`.petak-child-${petak.id}`);
       let petakSum = 0;
-      petakInputs.forEach(input => {
-        petakSum += parseFloat(input.value) || 0;
+      let luasSum = 0;
+      let pohonSum = 0;
+
+      childRows.forEach(tr => {
+        const targetInput = tr.querySelector('.target-input-val');
+        const luasInput = tr.querySelector('.target-luas-val');
+        const pohonInput = tr.querySelector('.target-pohon-val');
+
+        if (targetInput) petakSum += parseFloat(targetInput.value) || 0;
+        if (luasInput) luasSum += parseFloat(luasInput.value) || 0;
+        if (pohonInput) pohonSum += parseInt(pohonInput.value) || 0;
       });
 
+      // Target validation
       if (petakSum > targetPetakVal) {
-        exceedMessage += `• Petak ${petak.nomor}: Input ${petakSum.toLocaleString('id-ID')} kg (Target Petak: ${targetPetakVal.toLocaleString('id-ID')} kg)\n`;
+        exceedMessage += `• Petak ${petak.nomor} (Target): Input ${petakSum.toLocaleString('id-ID')} kg (Target Petak: ${targetPetakVal.toLocaleString('id-ID')} kg)\n`;
       } else if (petakSum < targetPetakVal && petakSum > 0) {
-        shortWarningMessage += `• Petak ${petak.nomor}: Input ${petakSum.toLocaleString('id-ID')} kg (Target Petak: ${targetPetakVal.toLocaleString('id-ID')} kg)\n`;
+        shortWarningMessage += `• Petak ${petak.nomor} (Target): Input ${petakSum.toLocaleString('id-ID')} kg (Target Petak: ${targetPetakVal.toLocaleString('id-ID')} kg)\n`;
+      }
+
+      // Luas validation
+      if (luasSum > petakLuasLimit) {
+        exceedMessage += `• Petak ${petak.nomor} (Luas): Input ${luasSum.toFixed(2)} ha (Kapasitas Petak: ${petakLuasLimit.toFixed(2)} ha)\n`;
+      } else if (luasSum < petakLuasLimit && luasSum > 0) {
+        shortWarningMessage += `• Petak ${petak.nomor} (Luas): Input ${luasSum.toFixed(2)} ha (Kapasitas Petak: ${petakLuasLimit.toFixed(2)} ha)\n`;
+      }
+
+      // Pohon validation
+      if (pohonSum > petakPohonLimit) {
+        exceedMessage += `• Petak ${petak.nomor} (Pohon): Input ${pohonSum.toLocaleString('id-ID')} pohon (Kapasitas Petak: ${petakPohonLimit.toLocaleString('id-ID')} pohon)\n`;
+      } else if (pohonSum < petakPohonLimit && pohonSum > 0) {
+        shortWarningMessage += `• Petak ${petak.nomor} (Pohon): Input ${pohonSum.toLocaleString('id-ID')} pohon (Kapasitas Petak: ${petakPohonLimit.toLocaleString('id-ID')} pohon)\n`;
       }
     });
 
     if (exceedMessage) {
-      U().showToast(`Gagal menyimpan! Alokasi target melebihi target petak yang ditetapkan Admin.`, 'danger');
-      alert(`Gagal menyimpan!\n\nAlokasi target penyadap melebihi target petak yang ditetapkan Admin:\n\n${exceedMessage}`);
+      U().showToast(`Gagal menyimpan! Alokasi melebihi kapasitas yang ditetapkan Admin.`, 'danger');
+      alert(`Gagal menyimpan!\n\nAlokasi melebihi kapasitas petak yang ditetapkan Admin:\n\n${exceedMessage}`);
       return;
     }
 
     if (shortWarningMessage) {
-      const confirmSave = confirm(`Peringatan:\n\nAlokasi target penyadap masih kurang dari target petak pada beberapa petak berikut:\n\n${shortWarningMessage}\nApakah Anda yakin ingin tetap menyimpan?`);
+      const confirmSave = confirm(`Peringatan:\n\nAlokasi target/luas/pohon masih kurang dari kapasitas petak pada beberapa petak berikut:\n\n${shortWarningMessage}\nApakah Anda yakin ingin tetap menyimpan?`);
       if (!confirmSave) return;
     }
 
@@ -1628,8 +1791,13 @@ const TargetModule = (() => {
       const id = input.getAttribute('data-id');
       const penyadap_id = input.getAttribute('data-pnd');
       const anak_petak_id = input.getAttribute('data-ap');
-      const luas_ha = parseFloat(input.getAttribute('data-luas')) || 0;
-      const pohon = parseInt(input.getAttribute('data-pohon')) || 0;
+      
+      const tr = input.closest('tr');
+      const luasEl = tr.querySelector('.target-luas-val');
+      const pohonEl = tr.querySelector('.target-pohon-val');
+
+      const luas_ha = luasEl ? (parseFloat(luasEl.value) || 0) : 0;
+      const pohon = pohonEl ? (parseInt(pohonEl.value) || 0) : 0;
       const target_kg = parseFloat(input.value) || 0;
 
       const recordId = id.startsWith('new-') ? U().uuid() : id;

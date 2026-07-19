@@ -147,6 +147,13 @@ class SipenaApp {
 
       // Data Migration: Perbaiki realisasi dengan tpg_id null
       await this._migrateRealisasiTpgId();
+
+      // Data Migration: Bersihkan duplikat target & penugasan
+      await this._deduplicateTargetPenyadap();
+      await this._deduplicatePenugasan();
+
+      // Data Migration: Pulihkan luas & pohon master anak_petak dari data seed
+      await this._restoreAnakPetakMasterValues();
     } catch (err) {
       this.showToast('Gagal memuat database lokal: ' + err.message, 'danger');
     }
@@ -428,6 +435,102 @@ class SipenaApp {
       console.warn('[Migration] _migrateRealisasiTpgId skipped:', e.message);
     }
   }
+
+  async _deduplicateTargetPenyadap() {
+    try {
+      const allTargets = await window.db.getAllActive('target_penyadap');
+      const seen = new Map();
+      const toDelete = [];
+
+      for (const t of allTargets) {
+        const key = `${t.tahun}_${t.penyadap_id}_${t.anak_petak_id}`;
+        if (seen.has(key)) {
+          const existing = seen.get(key);
+          // Simpan yang target_kg-nya lebih besar atau yang terbaru
+          if ((t.target_kg || 0) > (existing.target_kg || 0)) {
+            toDelete.push(existing.id);
+            seen.set(key, t);
+          } else {
+            toDelete.push(t.id);
+          }
+        } else {
+          seen.set(key, t);
+        }
+      }
+
+      for (const id of toDelete) {
+        await window.db.hardDelete('target_penyadap', id);
+      }
+      if (toDelete.length > 0) {
+        console.log(`[Migration] Cleaned up ${toDelete.length} duplicate target_penyadap records.`);
+      }
+    } catch (e) {
+      console.warn('[Migration] _deduplicateTargetPenyadap failed:', e);
+    }
+  }
+
+  async _deduplicatePenugasan() {
+    try {
+      const allPg = await window.db.getAllActive('penugasan');
+      const activePg = allPg.filter(pg => pg.aktif === 1);
+      const seen = new Map();
+      const toDelete = [];
+
+      for (const pg of activePg) {
+        const key = `${pg.penyadap_id}_${pg.anak_petak_id}`;
+        if (seen.has(key)) {
+          const existing = seen.get(key);
+          // Simpan yang terbuat terakhir
+          if (new Date(pg.created_at || 0) > new Date(existing.created_at || 0)) {
+            toDelete.push(existing.id);
+            seen.set(key, pg);
+          } else {
+            toDelete.push(pg.id);
+          }
+        } else {
+          seen.set(key, pg);
+        }
+      }
+
+      for (const id of toDelete) {
+        await window.db.hardDelete('penugasan', id);
+      }
+      if (toDelete.length > 0) {
+        console.log(`[Migration] Cleaned up ${toDelete.length} duplicate penugasan records.`);
+      }
+    } catch (e) {
+      console.warn('[Migration] _deduplicatePenugasan failed:', e);
+    }
+  }
+
+  async _restoreAnakPetakMasterValues() {
+    try {
+      if (!window.SIPENA_SEED_DATA || !window.SIPENA_SEED_DATA.anak_petak) return;
+      const seedAP = window.SIPENA_SEED_DATA.anak_petak;
+      const allAP = await window.db.getAllActive('anak_petak');
+      
+      let restoredCount = 0;
+      for (const ap of allAP) {
+        const original = seedAP.find(x => x.id === ap.id);
+        if (original) {
+          if (ap.luas_ha !== original.luas_ha || ap.jumlah_pohon !== original.jumlah_pohon) {
+            ap.luas_ha = original.luas_ha;
+            ap.jumlah_pohon = original.jumlah_pohon;
+            ap.updated_at = new Date().toISOString();
+            ap.updated_by = 'system_recovery';
+            await window.db.put('anak_petak', ap);
+            restoredCount++;
+          }
+        }
+      }
+      if (restoredCount > 0) {
+        console.log(`[Migration] Restored ${restoredCount} anak_petak master records to seed sizes.`);
+      }
+    } catch (e) {
+      console.warn('[Migration] _restoreAnakPetakMasterValues failed:', e);
+    }
+  }
+
 
   async seedDatabaseIfEmpty() {
     const SEED_VERSION = 'seed-v4'; // Naikkan versi ini setiap kali seed-data.js diperbarui

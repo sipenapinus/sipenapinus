@@ -22,8 +22,16 @@ const MasterPenyadap = (() => {
       const allPgn = await window.db.getAllActive('penugasan');
       const allAP = await window.db.getAllActive('anak_petak');
       const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
-      const assignedPndIds = allPgn.filter(pg => apIds.includes(pg.anak_petak_id)).map(pg => pg.penyadap_id);
-      data = all.filter(p => assignedPndIds.includes(p.id) || p.created_by === user.id);
+      const assignedPndIds = allPgn.filter(pg => pg.aktif === 1 && apIds.includes(pg.anak_petak_id)).map(pg => pg.penyadap_id);
+      
+      const allUsers = await window.db.getAllActive('users');
+      const usersInSameTpg = new Set(allUsers.filter(u => u.scope === scope).map(u => u.id));
+
+      data = all.filter(p => 
+        assignedPndIds.includes(p.id) || 
+        p.created_by === user.id || 
+        usersInSameTpg.has(p.created_by)
+      );
     }
 
     if (state.filterStatus) data = data.filter(r => r.status === state.filterStatus);

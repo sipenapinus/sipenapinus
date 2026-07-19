@@ -1005,50 +1005,73 @@ const DashboardModule = (() => {
       const aps = apOfTpg.filter(ap => ap.petak_id === pt.id);
       const apIds = aps.map(a => a.id);
 
-      // Cari target penyadap untuk anak petak ini
-      const targetList = targetPndOfMdr.filter(tp => apIds.includes(tp.anak_petak_id));
+      const adminTargetPetak = aps.reduce((sum, ap) => {
+        const record = apTargetList.find(x => x.anak_petak_id === ap.id);
+        return sum + (record ? (record.target_kg || 0) : 0);
+      }, 0);
+
+      // Cari penugasan penyadap untuk anak petak ini (yang aktif)
+      const penugasanList = allPgn.filter(pg => pg.aktif === 1 && apIds.includes(pg.anak_petak_id));
 
       // Jika ada pencarian, saring penyadapnya
-      let filteredTargets = targetList;
+      let filteredPenugasan = penugasanList;
       if (state.search) {
-        filteredTargets = targetList.filter(targ => {
-          const psy = allPnd.find(p => p.id === targ.penyadap_id);
+        filteredPenugasan = penugasanList.filter(pg => {
+          const psy = allPnd.find(p => p.id === pg.penyadap_id);
           return psy && psy.nama.toLowerCase().includes(state.search.toLowerCase());
         });
       }
 
-      if (filteredTargets.length === 0) continue;
+      if (filteredPenugasan.length === 0) continue;
 
       // Hitung akumulasi petak
-      const totTargetTahun = filteredTargets.reduce((s, x) => s + (x.target_kg || 0), 0);
+      const totTargetTahun = filteredPenugasan.reduce((s, pg) => {
+        const targ = targetPndOfMdr.find(tp => tp.penyadap_id === pg.penyadap_id && tp.anak_petak_id === pg.anak_petak_id);
+        return s + (targ ? (targ.target_kg || 0) : 0);
+      }, 0);
+      const totLuas = filteredPenugasan.reduce((s, pg) => {
+        const targ = targetPndOfMdr.find(tp => tp.penyadap_id === pg.penyadap_id && tp.anak_petak_id === pg.anak_petak_id);
+        const ap = aps.find(a => a.id === pg.anak_petak_id);
+        return s + (targ ? (targ.luas_ha || 0) : (ap ? (ap.luas_ha || 0) : 0));
+      }, 0);
+      const totPohon = filteredPenugasan.reduce((s, pg) => {
+        const targ = targetPndOfMdr.find(tp => tp.penyadap_id === pg.penyadap_id && tp.anak_petak_id === pg.anak_petak_id);
+        const ap = aps.find(a => a.id === pg.anak_petak_id);
+        return s + (targ ? (targ.pohon || 0) : (pg.jumlah_pohon || (ap ? (ap.jumlah_pohon || 0) : 0)));
+      }, 0);
       
       // Ambil realisasi kumulatif s.d hari ini untuk penyadap-penyadap di anak petak ini
       let totProd = 0;
       let totRo = 0;
       let totReal = 0;
 
-      const tableRows = filteredTargets.map((targ, idx) => {
-        const psy = allPnd.find(p => p.id === targ.penyadap_id);
-        const ap  = aps.find(a => a.id === targ.anak_petak_id);
+      const tableRows = filteredPenugasan.map((pg, idx) => {
+        const psy = allPnd.find(p => p.id === pg.penyadap_id);
+        const ap  = aps.find(a => a.id === pg.anak_petak_id);
+        
+        // Cari target record jika ada
+        const targ = targetPndOfMdr.find(tp => tp.penyadap_id === pg.penyadap_id && tp.anak_petak_id === pg.anak_petak_id);
         
         // Target tahunan penyadap di petak ini
-        const tgtTahun = targ.target_kg || 0;
+        const tgtTahun = targ ? (targ.target_kg || 0) : 0;
+        const luasVal  = targ ? (targ.luas_ha || 0) : (ap ? (ap.luas_ha || 0) : 0);
+        const pohonVal = targ ? (targ.pohon || 0) : (pg.jumlah_pohon || (ap ? (ap.jumlah_pohon || 0) : 0));
 
         // Produksi s.d hari ini (Juli 2026)
         const prodPenyadap = allReal
-          .filter(rl => rl.penyadap_id === targ.penyadap_id && new Date(rl.tanggal).getFullYear() === t)
+          .filter(rl => rl.penyadap_id === pg.penyadap_id && new Date(rl.tanggal).getFullYear() === t)
           .reduce((sum, rl) => sum + (rl.berat_bersih || 0), 0);
         totProd += prodPenyadap;
         const prodPct = tgtTahun > 0 ? ((prodPenyadap / tgtTahun) * 100).toFixed(2) : '0.00';
 
         // RO Periode ini
-        const roPenyadapObj = roPeriodeList.find(ro => ro.penyadap_id === targ.penyadap_id && ro.areal_id === targ.anak_petak_id);
+        const roPenyadapObj = roPeriodeList.find(ro => ro.penyadap_id === pg.penyadap_id && ro.areal_id === pg.anak_petak_id);
         const roPenyadap = roPenyadapObj ? roPenyadapObj.kesanggupan : 0;
         totRo += roPenyadap;
 
         // Realisasi Periode ini
         const realPenyadap = realPeriodeList
-          .filter(rl => rl.penyadap_id === targ.penyadap_id)
+          .filter(rl => rl.penyadap_id === pg.penyadap_id)
           .reduce((sum, rl) => sum + (rl.berat_bersih || 0), 0);
         totReal += realPenyadap;
         const realRoPct = roPenyadap > 0 ? ((realPenyadap / roPenyadap) * 100).toFixed(2) : '0.00';
@@ -1063,15 +1086,15 @@ const DashboardModule = (() => {
           'ludang': 'Ludang',
           'sakit': 'Sakit', 'izin': 'Izin', 'tidak_hadir': 'Tidak Hadir'
         };
-        const monPenyadap = monitoringToday.find(m => m.penyadap_id === targ.penyadap_id && m.anak_petak_id === targ.anak_petak_id);
-        const khdPenyadap = pndKehadiranToday.find(k => k.penyadap_id === targ.penyadap_id);
+        const monPenyadap = monitoringToday.find(m => m.penyadap_id === pg.penyadap_id && m.anak_petak_id === pg.anak_petak_id);
+        const khdPenyadap = pndKehadiranToday.find(k => k.penyadap_id === pg.penyadap_id);
 
         let ket = 'Belum Setor';
         let ketBadge = 'badge-inactive';
 
         // Cari setoran terakhir periode ini
         const lastRl = realPeriodeList
-          .filter(rl => rl.penyadap_id === targ.penyadap_id)
+          .filter(rl => rl.penyadap_id === pg.penyadap_id)
           .sort((x, y) => new Date(y.tanggal) - new Date(x.tanggal))[0];
 
         if (lastRl) {
@@ -1105,6 +1128,10 @@ const DashboardModule = (() => {
               <strong>${psy ? psy.nama : '—'}</strong>
               <div class="text-muted-sm">${psy ? psy.nomor : ''}</div>
             </td>
+            <td>
+              <strong>${(luasVal || 0).toFixed(2)} ha</strong>
+              <div class="text-muted-sm">${(pohonVal || 0).toLocaleString('id-ID')} pohon</div>
+            </td>
             <td>${tgtTahun.toLocaleString('id-ID')} Kg</td>
             <td>
               <strong>${prodPenyadap.toLocaleString('id-ID')} Kg</strong>
@@ -1128,13 +1155,20 @@ const DashboardModule = (() => {
       petakHtml += `
         <div style="margin-bottom:2rem;">
           <!-- Header Petak -->
-          <div style="background:var(--primary);color:white;padding:.5rem 1rem;border-radius:var(--radius-sm) var(--radius-sm) 0 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
-            <strong style="font-size:1rem;">PETAK ${pt.nomor}</strong>
-            <div style="display:flex;gap:1.5rem;font-size:.8rem;">
-              <div>TARGET PETAK: <strong>${totTargetTahun.toLocaleString('id-ID')} Kg</strong></div>
-              <div>PRODUKSI: <strong>${totProd.toLocaleString('id-ID')} Kg (${totProdPct}%)</strong></div>
-              <div>RO: <strong>${totRo.toLocaleString('id-ID')} Kg</strong></div>
-              <div>REALISASI: <strong>${totReal.toLocaleString('id-ID')} Kg (${totRealRoPct}%)</strong></div>
+          <div style="background:var(--primary);color:white;padding:.6rem 1rem;border-radius:var(--radius-sm) var(--radius-sm) 0 0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:0.4rem;">
+              <strong style="font-size:1.1rem;letter-spacing:0.5px;">PETAK ${pt.nomor}</strong>
+              <div style="display:flex;gap:1.5rem;font-size:.82rem;font-weight:600;">
+                <div>PRODUKSI: <span style="background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:3px;">${totProd.toLocaleString('id-ID')} Kg (${totProdPct}%)</span></div>
+                <div>RO: <span style="background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:3px;">${totRo.toLocaleString('id-ID')} Kg</span></div>
+                <div>REALISASI: <span style="background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:3px;">${totReal.toLocaleString('id-ID')} Kg (${totRealRoPct}%)</span></div>
+              </div>
+            </div>
+            
+            <div style="border-top:1px dashed rgba(255,255,255,0.25);padding-top:0.4rem;display:flex;gap:1.5rem;font-size:.78rem;opacity:0.95;flex-wrap:wrap;">
+              <div>🎯 <strong>Target</strong>: ${adminTargetPetak.toLocaleString('id-ID')} Kg (Terisi: ${totTargetTahun.toLocaleString('id-ID')} Kg | Kurang: ${Math.max(0, adminTargetPetak - totTargetTahun).toLocaleString('id-ID')} Kg)</div>
+              <div>🗺️ <strong>Luas</strong>: ${(pt.luas_ha || 0).toFixed(2)} ha (Terisi: ${totLuas.toFixed(2)} ha | Kurang: ${Math.max(0, (pt.luas_ha || 0) - totLuas).toFixed(2)} ha)</div>
+              <div>🌲 <strong>Pohon</strong>: ${(pt.jumlah_pohon || 0).toLocaleString('id-ID')} (Terisi: ${totPohon.toLocaleString('id-ID')} | Kurang: ${Math.max(0, (pt.jumlah_pohon || 0) - totPohon).toLocaleString('id-ID')})</div>
             </div>
           </div>
           
@@ -1146,6 +1180,7 @@ const DashboardModule = (() => {
                   <tr>
                     <th style="width:50px">NO</th>
                     <th>PENYADAP</th>
+                    <th>LUAS & POHON</th>
                     <th>TARGET TAHUNAN</th>
                     <th>PRODUKSI S.D HARI INI</th>
                     <th>RO PERIODE INI</th>
@@ -1158,6 +1193,10 @@ const DashboardModule = (() => {
                   <!-- Baris Jumlah -->
                   <tr style="background:var(--bg-surface-elevated);font-weight:700;">
                     <td colspan="2" style="text-align:right;">JUMLAH:</td>
+                    <td>
+                      ${totLuas.toFixed(2)} ha
+                      <div class="text-muted-sm" style="font-weight:normal;">${totPohon.toLocaleString('id-ID')} pohon</div>
+                    </td>
                     <td>${totTargetTahun.toLocaleString('id-ID')} Kg</td>
                     <td>
                       ${totProd.toLocaleString('id-ID')} Kg

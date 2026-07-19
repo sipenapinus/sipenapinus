@@ -81,16 +81,25 @@ const MasterPenugasan = (() => {
 
     if ((role === 'mandor' || role === 'tpg') && scope) {
       const allPgn = await window.db.getAllActive('penugasan');
-      const allAP = await window.db.getAllActive('anak_petak');
-      const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
-      
-      const assignedInScope = allPgn.filter(pg => apIds.includes(pg.anak_petak_id)).map(pg => pg.penyadap_id);
-      const allAssigned = new Set(allPgn.map(pg => pg.penyadap_id));
+      const allAP  = await window.db.getAllActive('anak_petak');
+      const apIds  = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
 
-      filtered = all.filter(p => 
-        assignedInScope.includes(p.id) || 
-        !allAssigned.has(p.id) || 
-        p.created_by === user.id
+      // Penyadap yang sudah ditugaskan di wilayah ini
+      const assignedInScope = allPgn.filter(pg => pg.aktif === 1 && apIds.includes(pg.anak_petak_id)).map(pg => pg.penyadap_id);
+      // Penyadap yang sudah ditugaskan di mana saja (di luar wilayah ini) - hanya hitung penugasan yang aktif
+      const assignedElsewhere = new Set(
+        allPgn.filter(pg => pg.aktif === 1 && pg.anak_petak_id && !apIds.includes(pg.anak_petak_id)).map(pg => pg.penyadap_id)
+      );
+
+      // Cari tahu siapa saja user di TPG yang sama (agar tapper yang dibuat Mandor TPG bisa ditugaskan Mandor Sadap)
+      const allUsers = await window.db.getAllActive('users');
+      const usersInSameTpg = new Set(allUsers.filter(u => u.scope === scope).map(u => u.id));
+
+      filtered = all.filter(p =>
+        assignedInScope.includes(p.id) ||                         // sudah ditugaskan di wilayah mandor ini
+        p.created_by === user.id  ||                               // dibuat oleh mandor ini
+        usersInSameTpg.has(p.created_by) ||                        // dibuat oleh Mandor TPG di wilayah yang sama
+        (!assignedElsewhere.has(p.id) && p.status === 'aktif')      // belum ditugaskan di wilayah lain & aktif
       );
     }
 
@@ -124,7 +133,7 @@ const MasterPenugasan = (() => {
     if ((role === 'mandor' || role === 'tpg') && scope) {
       filteredAP = allAP.filter(ap => {
         if (ap.tpg_id !== scope) return false;
-        if (role === 'mandor') {
+        if (role === 'mandor' && user) {
           const parentPetak = allPetak.find(p => p.id === ap.petak_id);
           if (!parentPetak || parentPetak.mandor_id !== user.id) return false;
         }
@@ -185,26 +194,25 @@ const MasterPenugasan = (() => {
     const existing    = await window.db.get('penugasan', id);
     const penyadap_id = document.getElementById('pgn-penyadap').value;
     const ap_id       = document.getElementById('pgn-anak-petak').value;
-    const persen      = parseInt(document.getElementById('pgn-persen').value) || 0;
-    const jml_pohon   = parseInt(document.getElementById('pgn-pohon').value) || 0;
 
     if (!penyadap_id) { U().showToast('Pilih Penyadap terlebih dahulu', 'danger'); return; }
     if (!ap_id)       { U().showToast('Pilih Petak terlebih dahulu', 'danger'); return; }
-    if (persen < 1 || persen > 100) { U().showToast('Target harus antara 1–100', 'danger'); return; }
 
-    // Validasi: total % untuk anak_petak_id yang sama tidak > 100%
+    // Cek duplikat Penugasan aktif untuk Penyadap yang sama di Anak Petak yang sama
     const allPgn  = await window.db.getAllActive('penugasan');
-    const sibling = allPgn.filter(r => r.anak_petak_id === ap_id && r.aktif === 1 && r.id !== id);
-    const total   = sibling.reduce((s, r) => s + (r.persen_target || 0), 0) + persen;
-    if (total > 100) {
-      U().showToast(`Total target untuk petak ini sudah ${total - persen}%, tidak dapat ditambah ${persen}% lagi (maks. 100%)`, 'danger');
+    const dup = allPgn.find(r => r.penyadap_id === penyadap_id && r.anak_petak_id === ap_id && r.aktif === 1 && r.id !== id);
+    if (dup) {
+      U().showToast('Penyadap sudah memiliki penugasan aktif di petak ini', 'danger');
       return;
     }
 
     const aktif = parseInt(document.getElementById('pgn-aktif').value);
     const record = {
-      id, penyadap_id, anak_petak_id: ap_id, persen_target: persen,
-      jumlah_pohon: jml_pohon,
+      id, 
+      penyadap_id, 
+      anak_petak_id: ap_id, 
+      persen_target: existing ? existing.persen_target : 100,
+      jumlah_pohon: existing ? existing.jumlah_pohon : 0,
       tanggal_mulai:  existing ? existing.tanggal_mulai : U().today(),
       tanggal_selesai: null,
       aktif,

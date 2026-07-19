@@ -52,9 +52,9 @@ const MasterImport = (() => {
     },
     penugasan: {
       label: 'Penugasan',
-      headers: ['penyadap_id', 'anak_petak_id', 'persen_target', 'jumlah_pohon', 'aktif', 'keterangan'],
-      example: [['ID-PENYADAP', 'ID-ANAK-PETAK', 100, 500, 1, '']],
-      notes: 'persen_target: 1–100 | aktif: 1=Aktif, 0=Selesai'
+      headers: ['nomor_penyadap', 'nama_penyadap', 'no_petak'],
+      example: [['PS-001', 'TARPIN', '42']],
+      notes: 'nomor_penyadap: nomor penyadap | nama_penyadap: nama (otomatis terisi) | no_petak: isi nomor petak penugasan'
     },
     user: {
       label: 'User',
@@ -94,26 +94,36 @@ const MasterImport = (() => {
     },
     target_penyadap: {
       label: 'Target Penyadap',
-      headers: ['tahun', 'nomor_penyadap', 'no_petak', 'huruf_anak_petak', 'luas_ha', 'pohon', 'target_kg'],
-      example: [[2026, 'PS-001', '42', 'A', 12.5, 1250, 1000]],
-      notes: 'nomor_penyadap: no penyadap | no_petak: nomor petak | huruf_anak_petak: huruf anak petak | pohon: jumlah pohon'
+      headers: ['tahun', 'nomor_penyadap', 'no_petak', 'luas_ha', 'pohon', 'target_kg'],
+      example: [[2026, 'PS-001', '42', 12.5, 1250, 1000]],
+      notes: 'nomor_penyadap: no penyadap | no_petak: nomor petak | pohon: jumlah pohon | huruf_anak_petak (opsional): isi jika satu petak punya beberapa anak petak'
     }
   };
 
   // ─────────────────────────────────────────────────────────────
   //  Download Template
   // ─────────────────────────────────────────────────────────────
-  function downloadTemplate(section) {
+  async function downloadTemplate(section) {
     if (typeof XLSX === 'undefined') { U().showToast('Library Excel belum tersedia', 'danger'); return; }
     const tmpl = TEMPLATES[section];
     if (!tmpl) { U().showToast('Template tidak ditemukan', 'danger'); return; }
 
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: Data (header + contoh)
-    const dataRows = [tmpl.headers, ...tmpl.example];
+    // Untuk target_penyadap, penyadap & penugasan: pre-fill dari data yang ada di DB
+    let dataRows;
+    if (section === 'target_penyadap') {
+      dataRows = await _buildTargetPenyadapRows();
+    } else if (section === 'penyadap') {
+      dataRows = await _buildPenyadapRows();
+    } else if (section === 'penugasan') {
+      dataRows = await _buildPenugasanRows();
+    } else {
+      dataRows = [tmpl.headers, ...tmpl.example];
+    }
+
     const wsData = XLSX.utils.aoa_to_sheet(dataRows);
-    wsData['!cols'] = tmpl.headers.map(() => ({ wch: 20 }));
+    wsData['!cols'] = dataRows[0].map(() => ({ wch: 20 }));
     XLSX.utils.book_append_sheet(wb, wsData, tmpl.label);
 
     // Sheet 2: Petunjuk
@@ -121,10 +131,11 @@ const MasterImport = (() => {
       ['TEMPLATE IMPORT — ' + tmpl.label.toUpperCase()],
       [''],
       ['Petunjuk:'],
-      ['1. Isi data mulai dari baris ke-3 (baris ke-2 adalah contoh, boleh dihapus).'],
-      ['2. Jangan mengubah nama kolom pada baris pertama.'],
-      ['3. ' + tmpl.notes],
+      ['1. Data penyadap & petak sudah terisi otomatis dari penugasan aktif.'],
+      ['2. Isi kolom target_kg (target produksi dalam Kg) untuk setiap penyadap.'],
+      ['3. Jangan mengubah nilai pada kolom lain (tahun, nomor_penyadap, no_petak, luas_ha, pohon).'],
       ['4. Simpan file dalam format .xlsx sebelum diimport.'],
+      ['5. ' + tmpl.notes],
     ];
     const wsPetunjuk = XLSX.utils.aoa_to_sheet(petunjuk);
     XLSX.utils.book_append_sheet(wb, wsPetunjuk, 'Petunjuk');
@@ -132,6 +143,145 @@ const MasterImport = (() => {
     XLSX.writeFile(wb, `Template_Import_${tmpl.label}_SIPENA.xlsx`);
     U().showToast(`Template ${tmpl.label} berhasil diunduh`);
   }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Build baris pre-filled Target Penyadap dari penugasan aktif
+  // ─────────────────────────────────────────────────────────────
+  async function _buildTargetPenyadapRows() {
+    const tahun    = new Date().getFullYear();
+    const headers  = TEMPLATES.target_penyadap.headers;
+
+    // Load semua data yang dibutuhkan
+    const [penugasan, penyadapAll, anakPetakAll, petakAll] = await Promise.all([
+      window.db.getAllActive('penugasan'),
+      window.db.getAllActive('penyadap_master'),
+      window.db.getAllActive('anak_petak'),
+      window.db.getAllActive('petak')
+    ]);
+
+    // Filter penugasan berdasarkan scope user (mandor/tpg)
+    const user = window.app && window.app.currentUser;
+    let filtered = penugasan.filter(pg => pg.aktif);
+    if (user && (user.role === 'mandor' || user.role === 'tpg') && user.scope) {
+      const apIds = anakPetakAll.filter(ap => ap.tpg_id === user.scope).map(ap => ap.id);
+      filtered = filtered.filter(pg => apIds.includes(pg.anak_petak_id));
+    }
+
+    // Buat baris pre-filled
+    const rows = [headers];
+    for (const pg of filtered) {
+      const ps  = penyadapAll.find(p => p.id === pg.penyadap_id);
+      const ap  = anakPetakAll.find(a => a.id === pg.anak_petak_id);
+      const ptk = ap ? petakAll.find(p => p.id === ap.petak_id) : null;
+      if (!ps || !ap || !ptk) continue;
+
+      rows.push([
+        tahun,
+        ps.nomor,
+        ptk.nomor,
+        ap.luas_ha     || '',
+        ap.jumlah_pohon || '',
+        ''   // ← target_kg: dikosongkan, mandor yang isi
+      ]);
+    }
+
+    // Jika belum ada penugasan, tampilkan baris contoh agar tidak membingungkan
+    if (rows.length === 1) {
+      rows.push(...TEMPLATES.target_penyadap.example);
+    }
+
+    return rows;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Build baris pre-filled Penyadap dari data yang sudah ada di DB
+  // ─────────────────────────────────────────────────────────────
+  async function _buildPenyadapRows() {
+    const headers = TEMPLATES.penyadap.headers;
+    const allPenyadap = await window.db.getAllActive('penyadap_master');
+
+    const rows = [headers];
+    for (const p of allPenyadap) {
+      rows.push([
+        p.nomor  || '',
+        p.nama   || '',
+        p.alamat || '',
+        p.no_hp  || '',
+        p.status || 'aktif'
+      ]);
+    }
+
+    // Jika belum ada data, tampilkan baris contoh
+    if (rows.length === 1) {
+      rows.push(...TEMPLATES.penyadap.example);
+    }
+
+    return rows;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Build baris pre-filled Penugasan dari penyadap yang terdaftar
+  // ─────────────────────────────────────────────────────────────
+  async function _buildPenugasanRows() {
+    const headers = TEMPLATES.penugasan.headers;
+    
+    // Load semua data
+    const [allPenyadap, allPenugasan, allAP, allPetak] = await Promise.all([
+      window.db.getAllActive('penyadap_master'),
+      window.db.getAllActive('penugasan'),
+      window.db.getAllActive('anak_petak'),
+      window.db.getAllActive('petak')
+    ]);
+
+    const user = window.app && window.app.currentUser;
+    const role = user ? user.role : '';
+    const scope = user ? user.scope : '';
+
+    let filteredPenyadap = allPenyadap;
+    if ((role === 'mandor' || role === 'tpg') && scope) {
+      const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
+      const assignedInScope = allPenugasan.filter(pg => apIds.includes(pg.anak_petak_id)).map(pg => pg.penyadap_id);
+      
+      filteredPenyadap = allPenyadap.filter(p =>
+        assignedInScope.includes(p.id) ||
+        p.created_by === user.id
+      );
+    }
+
+    const rows = [headers];
+    for (const p of filteredPenyadap) {
+      // Cari apakah penyadap ini sudah ada penugasan aktif
+      const activePg = allPenugasan.find(pg => pg.penyadap_id === p.id && pg.aktif === 1);
+      let ptkNo = '';
+      let pohon = '';
+      let persen = 100;
+      let aktif = 1;
+      let ket = '';
+
+      if (activePg) {
+        const ap = allAP.find(a => a.id === activePg.anak_petak_id);
+        const ptk = ap ? allPetak.find(pt => pt.id === ap.petak_id) : null;
+        if (ptk) ptkNo = ptk.nomor;
+        pohon = activePg.jumlah_pohon || '';
+        persen = activePg.persen_target || 100;
+        aktif = activePg.aktif;
+        ket = activePg.keterangan || '';
+      }
+
+      rows.push([
+        p.nomor,
+        p.nama || '',
+        ptkNo
+      ]);
+    }
+
+    if (rows.length === 1) {
+      rows.push(...TEMPLATES.penugasan.example);
+    }
+
+    return rows;
+  }
+
 
   // ─────────────────────────────────────────────────────────────
   //  Import + Validasi + Partial Import
@@ -508,9 +658,11 @@ const MasterImport = (() => {
   }
 
   // ── Validator Penyadap ──────────────────────────────────────
-  async function _validatePenyadap(row, rowNum, data, actor) {
+  async function _validatePenyadap(row, rowNum, data, actor, seenInSheet) {
     const errors = [];
-    if (!row.nomor) errors.push(_err(rowNum, 'nomor', 'Nomor penyadap wajib diisi'));
+    const nomorKey = String(row.nomor || '').toUpperCase().trim();
+
+    if (!nomorKey) errors.push(_err(rowNum, 'nomor', 'Nomor penyadap wajib diisi'));
     if (!row.nama)  errors.push(_err(rowNum, 'nama',  'Nama wajib diisi'));
 
     let status = String(row.status || 'aktif').trim().toLowerCase().replace(/[\s-]/g, '_');
@@ -521,18 +673,25 @@ const MasterImport = (() => {
       errors.push(_err(rowNum, 'status', `Status tidak valid: "${row.status}". Pilih: aktif | tidak_aktif | pindah | berhenti`));
     }
 
-    const dup = data.penyadap_all.find(r => r.nomor === String(row.nomor).toUpperCase());
-    if (dup) errors.push(_err(rowNum, 'nomor', `Nomor "${row.nomor}" sudah terdaftar di sistem`));
+    // Deteksi duplikat dalam file yang sama
+    if (nomorKey && seenInSheet.has(nomorKey)) {
+      errors.push(_err(rowNum, 'nomor', `Nomor "${nomorKey}" muncul lebih dari sekali dalam file Excel. Periksa apakah baris contoh template sudah dihapus.`));
+    } else if (nomorKey) {
+      seenInSheet.add(nomorKey);
+    }
+
+    // Upsert: jika nomor sudah ada → update data lama, bukan error
+    const existing = data.penyadap_all.find(r => r.nomor === nomorKey);
 
     if (errors.length) return { errors };
     return { record: {
-      id: U().uuid(),
-      nomor: String(row.nomor).toUpperCase().trim(),
+      id: existing ? existing.id : U().uuid(),
+      nomor: nomorKey,
       nama: String(row.nama).trim(),
       alamat: String(row.alamat || '').trim(),
       no_hp: String(row.no_hp || '').trim(),
       status,
-      ...U().makeAudit(actor)
+      ...U().makeAudit(actor, existing)
     }};
   }
 
@@ -581,7 +740,6 @@ const MasterImport = (() => {
     const petakId      = U().uuid();
     const luas_ha      = parseFloat(row.luas_ha) || 0;
     const jumlah_pohon = parseInt(row.jumlah_pohon) || 0;
-    const tpg_id       = tpgObj.id;
     const rph_id       = rphObj.id;
     const keterangan   = String(row.keterangan || '').trim();
 
@@ -641,29 +799,86 @@ const MasterImport = (() => {
   // ── Validator Penugasan ─────────────────────────────────────
   async function _validatePenugasan(row, rowNum, data, actor) {
     const errors = [];
-    if (!row.penyadap_id)   errors.push(_err(rowNum, 'penyadap_id',   'penyadap_id wajib diisi'));
-    if (!row.anak_petak_id) errors.push(_err(rowNum, 'anak_petak_id', 'anak_petak_id wajib diisi'));
 
-    const persen = parseInt(row.persen_target) || 0;
-    if (persen < 1 || persen > 100)
-      errors.push(_err(rowNum, 'persen_target', `Target harus antara 1–100 (nilai: ${persen})`));
+    // Support dua format:
+    // [BARU] nomor_penyadap + no_petak (human-readable, direkomendasikan)
+    // [LAMA] penyadap_id + anak_petak_id (UUID internal, backward compat)
+    let penyadapId  = null;
+    let anakPetakId = null;
+    let jumlahPohon = 0;
+
+    const useHumanReadable = !!(row.nomor_penyadap || row.no_petak);
+
+    if (useHumanReadable) {
+      // Resolve nomor penyadap → ID
+      const nomorPs = String(row.nomor_penyadap || '').trim().toUpperCase();
+      if (!nomorPs) {
+        errors.push(_err(rowNum, 'nomor_penyadap', 'Nomor penyadap wajib diisi'));
+      } else {
+        const ps = data.penyadap_all.find(p => p.nomor === nomorPs);
+        if (!ps) errors.push(_err(rowNum, 'nomor_penyadap', `Penyadap "${nomorPs}" tidak ditemukan di sistem`));
+        else penyadapId = ps.id;
+      }
+
+      // Resolve no_petak → anak_petak_id & jumlah_pohon (case-insensitive)
+      const noPetak = String(row.no_petak || '').trim().toUpperCase();
+      if (!noPetak) {
+        errors.push(_err(rowNum, 'no_petak', 'Nomor petak wajib diisi'));
+      } else {
+        const petak = data.petak_all.find(p => String(p.nomor).trim().toUpperCase() === noPetak);
+        if (!petak) {
+          errors.push(_err(rowNum, 'no_petak', `Petak "${noPetak}" tidak ditemukan di sistem`));
+        } else {
+          const ap = data.anak_petak_all.find(a => a.petak_id === petak.id);
+          if (!ap) {
+            errors.push(_err(rowNum, 'no_petak', `Anak Petak untuk Petak "${noPetak}" tidak ditemukan`));
+          } else {
+            anakPetakId = ap.id;
+            jumlahPohon = ap.jumlah_pohon || 0; // Otomatis ambil jumlah pohon dari Master
+          }
+        }
+      }
+    } else {
+      // Format lama: langsung pakai UUID
+      if (!row.penyadap_id)   errors.push(_err(rowNum, 'penyadap_id',   'penyadap_id wajib diisi'));
+      if (!row.anak_petak_id) errors.push(_err(rowNum, 'anak_petak_id', 'anak_petak_id wajib diisi'));
+      penyadapId  = row.penyadap_id   ? String(row.penyadap_id).trim()   : null;
+      anakPetakId = row.anak_petak_id ? String(row.anak_petak_id).trim() : null;
+      
+      if (anakPetakId) {
+        const ap = data.anak_petak_all.find(a => a.id === anakPetakId);
+        jumlahPohon = ap ? (ap.jumlah_pohon || 0) : 0;
+      }
+    }
+
+    const persen = 100;
 
     if (errors.length) return { errors };
+
+    // Cek duplikat penugasan aktif yang sama
+    const dupAktif = data.penugasan_all.find(r =>
+      r.penyadap_id === penyadapId &&
+      r.anak_petak_id === anakPetakId &&
+      r.aktif === 1
+    );
+    if (dupAktif) return { errors: [_err(rowNum, 'nomor_penyadap', `Penyadap ini sudah memiliki penugasan aktif di petak yang sama`)] };
+
     return { record: {
       id: U().uuid(),
-      penyadap_id: String(row.penyadap_id).trim(),
-      anak_petak_id: String(row.anak_petak_id).trim(),
+      penyadap_id:   penyadapId,
+      anak_petak_id: anakPetakId,
       persen_target: persen,
-      jumlah_pohon: parseInt(row.jumlah_pohon) || 0,
+      jumlah_pohon:  jumlahPohon, // Gunakan jumlah pohon yang di-resolve otomatis
       tanggal_mulai: U().today(),
       tanggal_selesai: null,
-      aktif: parseInt(row.aktif) || 1,
-      keterangan: String(row.keterangan || '').trim(),
+      aktif: 1,
+      keterangan: '',
       ...U().makeAudit(actor)
     }};
   }
 
   // ── Validator User ──────────────────────────────────────────
+
   async function _validateUser(row, rowNum, data, actor) {
     const errors = [];
     if (!row.nama_lengkap) errors.push(_err(rowNum, 'nama_lengkap', 'Nama lengkap wajib diisi'));
@@ -855,7 +1070,7 @@ const MasterImport = (() => {
     const errors = [];
     const tahun = parseInt(row.tahun);
     const nomorPenyadap = String(row.nomor_penyadap || '').trim().toUpperCase();
-    const noPetak = String(row.no_petak || '').trim();
+    const noPetak = String(row.no_petak || '').trim().toUpperCase();
     const hurufAnakPetak = String(row.huruf_anak_petak || '').trim().toUpperCase();
     const luas_ha = parseFloat(row.luas_ha) || 0;
     const pohon = parseInt(row.pohon) || 0;
@@ -864,20 +1079,27 @@ const MasterImport = (() => {
     if (!row.tahun || isNaN(tahun)) errors.push(_err(rowNum, 'tahun', 'Tahun wajib diisi dengan angka'));
     if (!nomorPenyadap) errors.push(_err(rowNum, 'nomor_penyadap', 'Nomor penyadap wajib diisi'));
     if (!noPetak) errors.push(_err(rowNum, 'no_petak', 'Nomor petak wajib diisi'));
-    if (!hurufAnakPetak) errors.push(_err(rowNum, 'huruf_anak_petak', 'Huruf anak petak wajib diisi'));
+    // huruf_anak_petak bersifat OPSIONAL — jika kosong, sistem otomatis ambil anak petak pertama dari petak
     if (!row.luas_ha || luas_ha <= 0) errors.push(_err(rowNum, 'luas_ha', 'Luas areal (Ha) harus lebih besar dari 0'));
     if (!row.target_kg || target_kg <= 0) errors.push(_err(rowNum, 'target_kg', 'Target produksi (Kg) harus lebih besar dari 0'));
 
-    const penyadap = data.penyadap_all.find(p => p.nomor === nomorPenyadap);
+    const penyadap = data.penyadap_all.find(p => String(p.nomor).trim().toUpperCase() === nomorPenyadap);
     if (nomorPenyadap && !penyadap) errors.push(_err(rowNum, 'nomor_penyadap', `Penyadap dengan nomor "${nomorPenyadap}" tidak ditemukan`));
 
-    const petak = data.petak_all.find(p => p.nomor === noPetak);
+    const petak = data.petak_all.find(p => String(p.nomor).trim().toUpperCase() === noPetak);
     let ap = null;
     if (noPetak && !petak) {
       errors.push(_err(rowNum, 'no_petak', `Petak dengan nomor "${noPetak}" tidak ditemukan`));
-    } else if (petak && hurufAnakPetak) {
-      ap = data.anak_petak_all.find(a => a.petak_id === petak.id && a.huruf === hurufAnakPetak);
-      if (!ap) errors.push(_err(rowNum, 'huruf_anak_petak', `Anak Petak "${noPetak}${hurufAnakPetak}" tidak ditemukan`));
+    } else if (petak) {
+      if (hurufAnakPetak) {
+        // Jika huruf diisi, cari yang spesifik
+        ap = data.anak_petak_all.find(a => a.petak_id === petak.id && String(a.huruf).trim().toUpperCase() === hurufAnakPetak);
+        if (!ap) errors.push(_err(rowNum, 'huruf_anak_petak', `Anak Petak "${noPetak}${hurufAnakPetak}" tidak ditemukan`));
+      } else {
+        // Jika huruf kosong, ambil anak petak pertama dari petak ini
+        ap = data.anak_petak_all.find(a => a.petak_id === petak.id);
+        if (!ap) errors.push(_err(rowNum, 'no_petak', `Tidak ada anak petak ditemukan untuk Petak "${noPetak}"`));
+      }
     }
 
     if (errors.length) return { errors };
@@ -890,21 +1112,21 @@ const MasterImport = (() => {
       seenInSheet.add(dupKey);
     }
 
-    // Validasi duplikat di DB
-    const dupDb = data.target_penyadap_all.find(x => x.tahun === tahun && x.penyadap_id === penyadap.id && x.anak_petak_id === ap.id);
-    if (dupDb) errors.push(_err(rowNum, 'nomor_penyadap', `Target Penyadap "${nomorPenyadap}" di Anak Petak "${noPetak}${hurufAnakPetak}" pada tahun ${tahun} sudah terdaftar`));
+    // Cek duplikat di DB — jika sudah ada, lakukan upsert (update) bukan error
+    const existingTarget = data.target_penyadap_all.find(x => x.tahun === tahun && x.penyadap_id === penyadap.id && x.anak_petak_id === ap.id);
 
     if (errors.length) return { errors };
 
+
     return { record: {
-      id: U().uuid(),
+      id: existingTarget ? existingTarget.id : U().uuid(),
       tahun,
       penyadap_id: penyadap.id,
       anak_petak_id: ap.id,
       luas_ha,
-      pohon: pohon || ap.jumlah_pohon || 0, // Fallback ke jumlah pohon di master anak petak
+      pohon: pohon > 0 ? pohon : (ap.jumlah_pohon || 0), // Fallback ke jumlah pohon di master anak petak
       target_kg,
-      ...U().makeAudit(actor)
+      ...U().makeAudit(actor, existingTarget)
     }};
   }
 
