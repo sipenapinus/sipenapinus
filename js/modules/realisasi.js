@@ -460,8 +460,14 @@ const RealisasiModule = (() => {
     const penyadapId  = document.getElementById('real-penyadap').value;
     if (!penyadapId)  { U().showToast('Pilih penyadap terlebih dahulu', 'danger'); return; }
 
-    const beratBersih = parseFloat(document.getElementById('real-berat-bersih').value) || 0;
-    if (beratBersih <= 0) { U().showToast('Berat bersih harus diisi', 'danger'); return; }
+    const rawVal = document.getElementById('real-berat-bersih').value;
+    if (rawVal === '' || rawVal === null || isNaN(parseFloat(rawVal))) {
+      U().showToast('Berat bersih harus diisi angka valid', 'danger'); return;
+    }
+    const beratBersih = parseFloat(rawVal);
+    if (beratBersih < 0) {
+      U().showToast('Berat bersih tidak boleh bernilai negatif', 'danger'); return;
+    }
 
     const user  = window.app.currentUser;
     let tpgId = user ? user.scope : null;
@@ -508,6 +514,7 @@ const RealisasiModule = (() => {
     U().showToast('Data realisasi dihapus');
     state.page = 1;
     await render();
+    if (window.DashboardModule) window.DashboardModule.init();
   }
 
   async function exportExcel() {

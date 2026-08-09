@@ -631,11 +631,12 @@ const TargetModule = (() => {
         : '—';
 
       // 1. Render the main Petak Row
+      const formattedPetakLuas = (parseFloat(group.luas_ha) || 0).toFixed(2);
       let html = `
         <tr style="background:rgba(255,255,255,0.015);border-bottom:1px solid rgba(255,255,255,0.05);">
           <td>${rowIdx++}</td>
           <td>${petakNameHtml}</td>
-          <td>${group.luas_ha || 0} ha</td>
+          <td>${formattedPetakLuas} ha</td>
           <td>${(group.pohon || 0).toLocaleString('id-ID')} pohon</td>
           <td><strong>${(group.target_petak || 0).toLocaleString('id-ID')} kg</strong></td>
           <td>${allocatedPenyadapHtml}</td>
@@ -645,10 +646,11 @@ const TargetModule = (() => {
       // 2. Render sub-rows for each Penyadap if assigned
       if (hasTappers) {
         group.tappers.forEach(tap => {
+          const formattedTapLuas = (parseFloat(tap.luas_ha) || 0).toFixed(2);
           const luasEl = perm.write ? `
             <input type="number" step="0.01" class="form-control target-luas-val" style="width:85px;display:inline-block;margin:0;"
-              value="${tap.luas_ha || ''}" placeholder="0"> ha
-          ` : `${tap.luas_ha || 0} ha`;
+              value="${tap.luas_ha ? (parseFloat(tap.luas_ha) || 0).toFixed(2) : ''}" placeholder="0.00"> ha
+          ` : `${formattedTapLuas} ha`;
 
           const pohonEl = perm.write ? `
             <input type="number" class="form-control target-pohon-val" style="width:95px;display:inline-block;margin:0;"
@@ -1328,10 +1330,8 @@ const TargetModule = (() => {
     U().showToast(existing ? 'RO berhasil diperbarui' : 'RO berhasil ditambahkan');
     
     // Refresh RO table & dashboard
-    if (window.app) {
-      await window.app.loadTargetROData();
-      await window.app.loadDashboardData();
-    }
+    await render();
+    if (window.DashboardModule) window.DashboardModule.init();
   }
 
   async function confirmDeleteRO(roId) {
@@ -1342,10 +1342,8 @@ const TargetModule = (() => {
     U().showToast('RO berhasil dihapus');
     
     // Refresh RO table & dashboard
-    if (window.app) {
-      await window.app.loadTargetROData();
-      await window.app.loadDashboardData();
-    }
+    await render();
+    if (window.DashboardModule) window.DashboardModule.init();
   }
 
   async function onAnakPetakChange(apId) {

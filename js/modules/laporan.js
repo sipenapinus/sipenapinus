@@ -50,23 +50,31 @@ const LaporanModule = (() => {
     const elJenis = document.getElementById('rpt-jenis');
     if (!elJenis) return;
 
-    // Clean up dropdown options based on role access
-    for (let i = elJenis.options.length - 1; i >= 0; i--) {
-      const val = elJenis.options[i].value;
-      if (role === 'mandor') {
-        if (val === 'pantauan_tpg' || val === 'buku_krph' || val === 'buku_bkph') {
-          elJenis.remove(i);
-        }
-      } else if (role === 'tpg') {
-        if (val === 'buku_krph' || val === 'buku_bkph') {
-          elJenis.remove(i);
-        }
-      } else if (role === 'krph') {
-        if (val === 'buku_bkph') {
-          elJenis.remove(i);
-        }
-      }
+    const ALL_OPTIONS = [
+      { val: 'realisasi', text: '🛢️ Laporan Realisasi Produksi' },
+      { val: 'kehadiran', text: '👷 Laporan Kehadiran Penyadap' },
+      { val: 'pantauan', text: '📋 Buku Mandor Sadap (Pantauan Kegiatan)' },
+      { val: 'pantauan_tpg', text: '🏭 Buku Mandor TPG (Penerimaan Getah)' },
+      { val: 'buku_krph', text: '🌲 Buku KRPH (Realisasi Per RPH)' },
+      { val: 'buku_bkph', text: '📊 Buku Asper/KBKPH (Realisasi Per BKPH)' }
+    ];
+
+    let allowedOptions = ALL_OPTIONS;
+    if (role === 'mandor') {
+      allowedOptions = ALL_OPTIONS.filter(o => o.val !== 'pantauan_tpg' && o.val !== 'buku_krph' && o.val !== 'buku_bkph');
+    } else if (role === 'tpg') {
+      allowedOptions = ALL_OPTIONS.filter(o => o.val !== 'buku_krph' && o.val !== 'buku_bkph');
+    } else if (role === 'krph') {
+      allowedOptions = ALL_OPTIONS.filter(o => o.val !== 'buku_bkph');
     }
+
+    const currentVal = elJenis.value;
+    const isCurrentAllowed = allowedOptions.some(o => o.val === currentVal);
+    const selectedVal = isCurrentAllowed ? currentVal : allowedOptions[0].val;
+
+    elJenis.innerHTML = allowedOptions.map(opt => 
+      `<option value="${opt.val}"${opt.val === selectedVal ? ' selected' : ''}>${opt.text}</option>`
+    ).join('');
   }
 
   function updateKopLabels() {
@@ -177,6 +185,8 @@ const LaporanModule = (() => {
       const childs = pnlRentang.querySelectorAll('.form-group');
       childs.forEach(c => c.style.display = 'block');
     }
+
+    renderReport();
   }
 
   async function renderReport() {
@@ -316,30 +326,37 @@ const LaporanModule = (() => {
 
     if (jenis === 'realisasi') {
       const rawRealisasi = await window.db.getAllActive('realisasi');
-      filtered = rawRealisasi.filter(r => dates.includes(r.tanggal));
+      let activePgns = allPgn.filter(pg => pg.aktif === 1);
       
-      // Filter by dropdown RPH/TPG
+      // Filter by dropdown RPH/TPG or role scope using active penugasan
       if (tpgId) {
-        filtered = filtered.filter(r => r.tpg_id === tpgId);
+        const apIds = allAP.filter(ap => ap.tpg_id === tpgId).map(ap => ap.id);
+        activePgns = activePgns.filter(pg => apIds.includes(pg.anak_petak_id));
       } else if (rphId) {
         const tpgs = allTpg.filter(t => t.rph_id === rphId).map(t => t.id);
-        filtered = filtered.filter(r => tpgs.includes(r.tpg_id));
+        const apIds = allAP.filter(ap => tpgs.includes(ap.tpg_id)).map(ap => ap.id);
+        activePgns = activePgns.filter(pg => apIds.includes(pg.anak_petak_id));
       } else {
-        // Fallback user scope
         const user = window.app.currentUser;
         const role = user ? user.role : '';
         const scope = user ? user.scope : null;
         if (scope && (role === 'tpg' || role === 'mandor')) {
-          filtered = filtered.filter(r => r.tpg_id === scope);
+          const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
+          activePgns = activePgns.filter(pg => apIds.includes(pg.anak_petak_id));
         } else if (scope && role === 'krph') {
           const tpgs = allTpg.filter(t => t.rph_id === scope).map(t => t.id);
-          filtered = filtered.filter(r => tpgs.includes(r.tpg_id));
+          const apIds = allAP.filter(ap => tpgs.includes(ap.tpg_id)).map(ap => ap.id);
+          activePgns = activePgns.filter(pg => apIds.includes(pg.anak_petak_id));
         } else if (scope && role === 'bkph') {
           const rphs = allRph.filter(r => r.bkph_id === scope).map(r => r.id);
           const tpgs = allTpg.filter(t => rphs.includes(t.rph_id)).map(t => t.id);
-          filtered = filtered.filter(r => tpgs.includes(r.tpg_id));
+          const apIds = allAP.filter(ap => tpgs.includes(ap.tpg_id)).map(ap => ap.id);
+          activePgns = activePgns.filter(pg => apIds.includes(pg.anak_petak_id));
         }
       }
+      const activePndIds = activePgns.map(pg => pg.penyadap_id);
+
+      filtered = rawRealisasi.filter(r => dates.includes(r.tanggal) && (activePndIds.length > 0 ? activePndIds.includes(r.penyadap_id) : true));
       filtered.sort((a,b) => a.tanggal.localeCompare(b.tanggal));
       reportData = filtered;
     } else if (jenis === 'kehadiran') {
@@ -421,9 +438,9 @@ const LaporanModule = (() => {
         const ap = allAP.find(a => a.id === pg.anak_petak_id);
         const ptk = ap ? allPetak.find(p => p.id === ap.petak_id) : null;
         
-        const luas_baku = ptk ? (ptk.luas_ha || 0) : 0;
-        const luas_sadapan = ap ? (ap.luas_ha || pg.luas_ha || 0) : 0;
-        const pohon = pg.jumlah_pohon || (ap ? ap.jumlah_pohon : 0) || 0;
+        const luas_baku = ptk ? (parseFloat(ptk.luas_ha) || 0) : 0;
+        const luas_sadapan = ap ? (parseFloat(ap.luas_ha) || parseFloat(pg.luas_ha) || 0) : 0;
+        const pohon = (parseInt(pg.jumlah_pohon) || 0) || (ap ? (parseInt(ap.jumlah_pohon) || 0) : 0);
 
         // Target tahunan
         const myTargets = targetList.filter(t => t.penyadap_id === psy.id && t.anak_petak_id === pg.anak_petak_id);
@@ -433,7 +450,9 @@ const LaporanModule = (() => {
         const dailyActivities = dates.map(d => {
           const r = realisasiList.find(x => x.penyadap_id === psy.id && x.tanggal === d);
           if (r) {
-            return `S. ${r.berat_bersih}`;
+            const v = parseFloat(r.berat_bersih) || 0;
+            const vStr = v % 1 === 0 ? v.toLocaleString('id-ID') : v.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            return `S. ${vStr}`;
           }
           const k = kehadiranList.find(x => x.penyadap_id === psy.id && x.tanggal === d);
           if (k) {
@@ -464,7 +483,7 @@ const LaporanModule = (() => {
 
         // Realisasi
         const myReals = realisasiList.filter(r => r.penyadap_id === psy.id && dates.includes(r.tanggal));
-        const realisasi = myReals.reduce((sum, r) => sum + (r.berat_bersih || 0), 0);
+        const realisasi = myReals.reduce((sum, r) => sum + (parseFloat(r.berat_bersih) || 0), 0);
 
         // Keaktifan — hanya aktif jika ada realisasi ATAU kegiatan spesifik
         const ACTIVE_WORK = ['pembaharuan_1','pembaharuan_2','pembaharuan_3','pengecasan','ludang'];
@@ -517,7 +536,7 @@ const LaporanModule = (() => {
         const idxA = getCustomSortIndex(`Petak ${a.petak_nomor}`);
         const idxB = getCustomSortIndex(`Petak ${b.petak_nomor}`);
         if (idxA !== idxB) return idxA - idxB;
-        return a.petak_nomor.localeCompare(b.petak_nomor, undefined, { numeric: true, sensitivity: 'base' });
+        return String(a.petak_nomor || '').localeCompare(String(b.petak_nomor || ''), undefined, { numeric: true, sensitivity: 'base' });
       });
 
       reportData = records;
@@ -619,7 +638,7 @@ const LaporanModule = (() => {
             r.tanggal === d &&
             r.tpg_id === grp.tpg_id
           );
-          return dayReals.reduce((sum, r) => sum + (r.berat_bersih || 0), 0);
+          return dayReals.reduce((sum, r) => sum + (parseFloat(r.berat_bersih) || 0), 0);
         });
 
         const realisasi = dailyActivities.reduce((sum, val) => sum + val, 0);
@@ -640,9 +659,9 @@ const LaporanModule = (() => {
       }
 
       records.sort((a, b) => {
-        const tpgComp = a.tpg_nama.localeCompare(b.tpg_nama);
+        const tpgComp = String(a.tpg_nama || '').localeCompare(String(b.tpg_nama || ''));
         if (tpgComp !== 0) return tpgComp;
-        return a.petak_nomor.localeCompare(b.petak_nomor, undefined, { numeric: true, sensitivity: 'base' });
+        return String(a.petak_nomor || '').localeCompare(String(b.petak_nomor || ''), undefined, { numeric: true, sensitivity: 'base' });
       });
 
       reportData = records;
@@ -748,7 +767,7 @@ const LaporanModule = (() => {
               r.tpg_id === tpg.id && 
               dates.includes(r.tanggal)
             );
-            const total = periodReals.reduce((sum, r) => sum + (r.berat_bersih || 0), 0);
+            const total = periodReals.reduce((sum, r) => sum + (parseFloat(r.berat_bersih) || 0), 0);
             const pct = target_tahun > 0 ? (total / target_tahun) * 100 : 0;
             return { total, pct };
           });
@@ -768,7 +787,7 @@ const LaporanModule = (() => {
         }
       }
 
-      records.sort((a, b) => a.rph_nama.localeCompare(b.rph_nama) || a.tpg_nama.localeCompare(b.tpg_nama));
+      records.sort((a, b) => String(a.rph_nama || '').localeCompare(String(b.rph_nama || '')) || String(a.tpg_nama || '').localeCompare(String(b.tpg_nama || '')));
 
       reportData = records;
       filtered = records;
@@ -869,7 +888,7 @@ const LaporanModule = (() => {
             tpgIds.includes(r.tpg_id) &&
             dates.includes(r.tanggal)
           );
-          const total = periodReals.reduce((sum, r) => sum + (r.berat_bersih || 0), 0);
+          const total = periodReals.reduce((sum, r) => sum + (parseFloat(r.berat_bersih) || 0), 0);
           const pct = target_tahun > 0 ? (total / target_tahun) * 100 : 0;
           return { total, pct };
         });
@@ -1193,17 +1212,17 @@ const LaporanModule = (() => {
             <tr>
               <td style="text-align:center;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${idx + 1}</td>
               <td style="border:1px solid #ccc;padding:4px;font-weight:700;font-size:0.8rem;">Petak ${row.petak_nomor}</td>
-              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${row.luas_baku.toFixed(2)}</td>
+              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${(parseFloat(row.luas_baku) || 0).toFixed(2)}</td>
               <td style="border:1px solid #ccc;padding:4px;">
                 <strong style="font-size:0.8rem;">${row.penyadap_nama}</strong>
                 <div style="font-size:0.7rem;color:#666;">${row.penyadap_nomor}</div>
               </td>
-              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${row.luas_sadapan.toFixed(2)}</td>
-              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${row.pohon.toLocaleString('id-ID')}</td>
-              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${row.target_tahun.toLocaleString('id-ID')}</td>
+              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${(parseFloat(row.luas_sadapan) || 0).toFixed(2)}</td>
+              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${(parseInt(row.pohon) || 0).toLocaleString('id-ID')}</td>
+              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${(parseInt(row.target_tahun) || 0).toLocaleString('id-ID')}</td>
               ${dailyCells}
-              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-weight:700;font-size:0.8rem;">${row.ro.toLocaleString('id-ID')}</td>
-              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-weight:700;font-size:0.8rem;color:#1b4d3e;">${row.realisasi.toLocaleString('id-ID')}</td>
+              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-weight:700;font-size:0.8rem;">${(parseInt(row.ro) || 0).toLocaleString('id-ID')}</td>
+              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-weight:700;font-size:0.8rem;color:#1b4d3e;">${(parseFloat(row.realisasi) || 0).toLocaleString('id-ID')}</td>
               <td style="text-align:center;border:1px solid #ccc;padding:4px;">
                 <span style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:0.72rem;font-weight:700;white-space:nowrap;color:${actColor};background:${actBg};">${row.aktivitas}</span>
               </td>
@@ -1224,12 +1243,12 @@ const LaporanModule = (() => {
         const ketCounts = {};
 
         filtered.forEach(r => {
-          totalLuasBaku += r.luas_baku;
-          totalLuasSadapan += r.luas_sadapan;
-          totalPohon += r.pohon;
-          totalTargetTahun += r.target_tahun;
-          totalRO += r.ro;
-          totalRealisasi += r.realisasi;
+          totalLuasBaku += (parseFloat(r.luas_baku) || 0);
+          totalLuasSadapan += (parseFloat(r.luas_sadapan) || 0);
+          totalPohon += (parseInt(r.pohon) || 0);
+          totalTargetTahun += (parseInt(r.target_tahun) || 0);
+          totalRO += (parseInt(r.ro) || 0);
+          totalRealisasi += (parseFloat(r.realisasi) || 0);
           if (r.aktivitas === 'Aktif') activeCount++;
           else {
             inactiveCount++;
@@ -1247,9 +1266,9 @@ const LaporanModule = (() => {
         const totalRowHtml = `
           <tr class="total-row" style="background:#a5d6a7;font-weight:bold;border-top:3px solid #388e3c;">
             <td colspan="2" style="text-align:center;border:1px solid #388e3c;padding:5px;font-size:0.8rem;color:#1b4d3e;">JUMLAH</td>
-            <td style="text-align:right;border:1px solid #388e3c;padding:5px;font-size:0.8rem;color:#1b4d3e;">${totalLuasBaku.toFixed(2)}</td>
+            <td style="text-align:right;border:1px solid #388e3c;padding:5px;font-size:0.8rem;color:#1b4d3e;">${(parseFloat(totalLuasBaku) || 0).toFixed(2)}</td>
             <td style="border:1px solid #388e3c;padding:5px;"></td>
-            <td style="text-align:right;border:1px solid #388e3c;padding:5px;font-size:0.8rem;color:#1b4d3e;">${totalLuasSadapan.toFixed(2)}</td>
+            <td style="text-align:right;border:1px solid #388e3c;padding:5px;font-size:0.8rem;color:#1b4d3e;">${(parseFloat(totalLuasSadapan) || 0).toFixed(2)}</td>
             <td style="text-align:right;border:1px solid #388e3c;padding:5px;font-size:0.8rem;color:#1b4d3e;">${totalPohon.toLocaleString('id-ID')}</td>
             <td style="text-align:right;border:1px solid #388e3c;padding:5px;font-size:0.8rem;color:#1b4d3e;">${totalTargetTahun.toLocaleString('id-ID')}</td>
             <td colspan="${dates.length}" style="border:1px solid #388e3c;padding:5px;"></td>
@@ -1350,10 +1369,10 @@ const LaporanModule = (() => {
               <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${row.target_tahun.toLocaleString('id-ID')}</td>
               <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${row.jml_penyadap}</td>
               <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;">${row.aktif_penyadap}</td>
-              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;font-weight:600;">${row.aktif_pct.toFixed(2)}%</td>
+              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-size:0.8rem;font-weight:600;">${(parseFloat(row.aktif_pct) || 0).toFixed(2)}%</td>
               ${dailyCells}
-              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-weight:700;font-size:0.8rem;color:#1b4d3e !important;background:#e8f5e9;">${row.realisasi.toLocaleString('id-ID')}</td>
-              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-weight:700;font-size:0.8rem;">${row.real_pct.toFixed(2)}%</td>
+              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-weight:700;font-size:0.8rem;color:#1b4d3e !important;background:#e8f5e9;">${(parseFloat(row.realisasi) || 0).toLocaleString('id-ID')}</td>
+              <td style="text-align:right;border:1px solid #ccc;padding:4px;font-weight:700;font-size:0.8rem;">${(parseFloat(row.real_pct) || 0).toFixed(2)}%</td>
               <td style="border:1px solid #ccc;padding:4px;font-size:0.78rem;color:#333;white-space:nowrap;text-align:left;">${row.keterangan}</td>
             </tr>
           `;

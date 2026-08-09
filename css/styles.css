@@ -863,4 +863,52 @@ code {
   }
 }
 
+/* ── Mobile Responsive Report & Tables ───────────────────────── */
+@media (max-width: 768px) {
+  .print-container {
+    padding: 1rem !important;
+    border-radius: var(--radius-sm) !important;
+  }
+  
+  .kop-surat {
+    flex-direction: column !important;
+    text-align: center !important;
+    gap: 0.5rem !important;
+  }
+  .kop-surat > div {
+    text-align: center !important;
+  }
+  .kop-surat img {
+    margin: 0 auto;
+  }
+
+  .report-header-flex {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+  .report-title-box h2 {
+    font-size: 1.05rem !important;
+    line-height: 1.35 !important;
+  }
+
+  #rpt-summary-master {
+    padding: 0.75rem !important;
+  }
+  #rpt-summary-master > div {
+    flex-direction: column !important;
+    gap: 0.4rem !important;
+  }
+  
+  .table-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 4px;
+    margin: 0 -0.5rem;
+    padding: 0 0.5rem;
+  }
+  .report-table {
+    min-width: 650px;
+  }
+}
+
 

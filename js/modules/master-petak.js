@@ -81,7 +81,7 @@ const MasterPetak = (() => {
           <td>${rph ? rph.nama : '—'}</td>
           <td>${tpg ? tpg.nama : '—'}</td>
           <td>${mandor ? mandor.nama_lengkap : '—'}</td>
-          <td>${(row.luas_ha || 0).toFixed(2)} ha</td>
+          <td>${(parseFloat(row.luas_ha) || 0).toFixed(2)} ha</td>
           <td>${(row.jumlah_pohon || 0).toLocaleString('id-ID')}</td>
           <td style="color:var(--text-secondary)">${row.kelas_hutan || '—'}</td>
           <td>${targetVal}</td>

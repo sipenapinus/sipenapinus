@@ -32,7 +32,7 @@ const MasterAnakPetak = (() => {
           <td><strong>${label}</strong></td>
           <td>${rph ? rph.nama : '—'}</td>
           <td>${petak ? `Petak ${petak.nomor}` : '—'}</td>
-          <td>${(row.luas_ha || 0).toFixed(2)} ha</td>
+          <td>${(parseFloat(row.luas_ha) || 0).toFixed(2)} ha</td>
           <td>${row.jumlah_pohon || 0} pohon</td>
           <td style="color:var(--text-secondary)">${row.keterangan || '—'}</td>
           <td>

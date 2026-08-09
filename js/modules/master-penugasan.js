@@ -40,19 +40,20 @@ const MasterPenugasan = (() => {
       tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Belum ada data Penugasan</td></tr>`;
     } else {
       tbody.innerHTML = pager.rows.map(row => {
-        const psy   = allPenyadap.find(p => p.id === row.penyadap_id);
+        const psy   = allPenyadap.find(p => p.id === row.penyadap_id || p.nomor === row.penyadap_id);
         const ap    = allAP.find(a => a.id === row.anak_petak_id);
         const petak = ap ? allPetak.find(p => p.id === ap.petak_id) : null;
         const label = petak && ap ? `Petak ${petak.nomor}${ap.huruf}` : '—';
         const aktifBadge = row.aktif ? 'badge-success' : 'badge-inactive';
         const aktifLabel = row.aktif ? 'Aktif' : 'Selesai';
+        const targetPersen = row.persen_target != null ? row.persen_target : 100;
         return `<tr>
           <td>
             <strong>${psy ? psy.nama : '—'}</strong>
             <div class="text-muted-sm">${psy ? psy.nomor : ''}</div>
           </td>
           <td>${label}</td>
-          <td><strong>${row.persen_target}%</strong></td>
+          <td><strong>${targetPersen}%</strong></td>
           <td><strong>${(row.jumlah_pohon || 0).toLocaleString('id-ID')} pohon</strong></td>
           <td style="color:var(--text-secondary);max-width:160px">${row.keterangan || '—'}</td>
           <td><span class="badge ${aktifBadge}">${aktifLabel}</span></td>
@@ -226,12 +227,18 @@ const MasterPenugasan = (() => {
     U().showToast(existing ? 'Penugasan diperbarui' : 'Penugasan berhasil ditambahkan');
     state.page = 1;
     await render();
+    if (window.DashboardModule) window.DashboardModule.init();
   }
 
   function confirmDelete(id) {
     if (!confirm('Hapus penugasan ini? Riwayat akan tetap tersimpan di database.')) return;
     window.db.softDelete('penugasan', id, U().currentActorId())
-      .then(() => { U().showToast('Penugasan dihapus'); state.page = 1; render(); });
+      .then(() => {
+        U().showToast('Penugasan dihapus');
+        state.page = 1;
+        render();
+        if (window.DashboardModule) window.DashboardModule.init();
+      });
   }
 
   function onSearch(val) { state.search = val; state.page = 1; render(); }

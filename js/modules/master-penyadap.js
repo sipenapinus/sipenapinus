@@ -56,7 +56,7 @@ const MasterPenyadap = (() => {
           <td>
             <div class="action-btns">
               <button class="btn btn-secondary btn-xs" onclick="MasterPenyadap.openEdit('${row.id}')">✏️ Edit</button>
-              <!-- Tidak ada tombol Hapus: Business Rule SIPENA-002 §6 -->
+              <button class="btn btn-danger btn-xs" onclick="MasterPenyadap.confirmDelete('${row.id}', '${row.nama}')">🗑️ Hapus</button>
             </div>
           </td>
         </tr>`;
@@ -84,6 +84,14 @@ const MasterPenyadap = (() => {
     document.getElementById('penyadap-status').value     = row.status;
     document.getElementById('penyadap-modal-title').textContent = 'Edit Penyadap';
     U().openModal('penyadap-modal');
+  }
+
+  async function confirmDelete(id, nama) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus data penyadap "${nama}"?`)) return;
+    await window.db.softDelete('penyadap_master', id, U().currentActorId());
+    await window.db.queueSync('penyadap_master', 'delete', { id });
+    U().showToast(`Penyadap "${nama}" berhasil dihapus`);
+    await render();
   }
 
   async function save(e) {
@@ -131,7 +139,7 @@ const MasterPenyadap = (() => {
     U().showToast('Export Excel berhasil');
   }
 
-  return { render, openAdd, openEdit, save, onSearch, onFilter, exportExcel };
+  return { render, openAdd, openEdit, confirmDelete, save, onSearch, onFilter, exportExcel };
 })();
 
 window.MasterPenyadap = MasterPenyadap;

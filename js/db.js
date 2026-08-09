@@ -233,7 +233,7 @@ class SipenaDB {
   /** Hanya record yang belum soft-deleted */
   async getAllActive(storeName) {
     const all = await this.getAll(storeName);
-    return all.filter(r => !r.deleted_at);
+    return all.filter(r => !r.deleted_at || r.deleted_at === '0000-00-00 00:00:00' || r.deleted_at === '0000-00-00' || r.deleted_at === 'null');
   }
 
   async put(storeName, data) {

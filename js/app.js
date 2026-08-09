@@ -164,11 +164,11 @@ class SipenaApp {
     // 3. Set up SPA Routing
     this.initRouting();
 
-    // 4. Update initial network state UI
-    this.updateNetworkStatus();
-
-    // 5. Authenticate session
+    // 4. Authenticate session
     await this.checkSession();
+
+    // 5. Update initial network state UI
+    this.updateNetworkStatus();
   }
 
   /**
@@ -410,19 +410,18 @@ class SipenaApp {
   async _migrateRealisasiTpgId() {
     try {
       const allReal = await window.db.getAllActive('realisasi');
-      const badReals = allReal.filter(r => !r.tpg_id || r.tpg_id === null || r.tpg_id === '');
-      if (badReals.length === 0) return;
+      if (allReal.length === 0) return;
 
       const allPgn = await window.db.getAllActive('penugasan');
-      const allAP = await window.db.getAllActive('anak_petak');
+      const allAP  = await window.db.getAllActive('anak_petak');
 
       let fixed = 0;
-      for (const r of badReals) {
+      for (const r of allReal) {
         const pgn = allPgn.find(pg => pg.penyadap_id === r.penyadap_id && pg.aktif === 1);
         if (!pgn) continue;
 
         const ap = allAP.find(a => a.id === pgn.anak_petak_id);
-        if (ap && ap.tpg_id) {
+        if (ap && ap.tpg_id && r.tpg_id !== ap.tpg_id) {
           r.tpg_id = ap.tpg_id;
           r.updated_at = new Date().toISOString();
           r.updated_by = 'system_migration';
@@ -430,7 +429,7 @@ class SipenaApp {
           fixed++;
         }
       }
-      if (fixed > 0) { /* migration realisasi tpg_id fixed */ }
+      if (fixed > 0) { console.log(`[Migration] Updated tpg_id for ${fixed} realisasi records.`); }
     } catch (e) {
       console.warn('[Migration] _migrateRealisasiTpgId skipped:', e.message);
     }
@@ -637,7 +636,10 @@ class SipenaApp {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./service-worker.js')
-          .then(reg => console.log('Service Worker registered with scope:', reg.scope))
+          .then(reg => {
+            console.log('Service Worker registered with scope:', reg.scope);
+            if (reg.update) reg.update();
+          })
           .catch(err => console.error('Service Worker registration failed:', err));
       });
     }
@@ -681,27 +683,128 @@ class SipenaApp {
   }
 
   /**
-   * Simulated synchronization of offline queues.
+   * Online synchronization of offline sync queue and server updates.
+   * On first sync (last_sync === 0), pushes ALL local data to MySQL.
    */
   async triggerBackgroundSync() {
     const queue = await window.db.getSyncQueue();
-    if (queue.length === 0) return;
+    const lastSyncMeta = await window.db.get('meta', 'last_sync');
+    const lastSync = lastSyncMeta ? (lastSyncMeta.value || 0) : 0;
+    // isFirstSync: belum pernah sinkron sama sekali (0) atau sedang dalam sesi baru
+    const isFirstSync = (lastSync === 0);
 
-    console.log(`[Sync] Found ${queue.length} items to sync...`);
-    this.showToast(`Menyinkronkan ${queue.length} perubahan lokal ke server...`, 'warning');
+    // Stores to sync (master + transactional)
+    const SYNC_STORES = [
+      'users', 'bkph', 'rph', 'tpg', 'petak', 'anak_petak', 'penyadap_master',
+      'penugasan', 'target_bkph', 'target_rph', 'target_tpg', 'target_mandor',
+      'target_penyadap', 'target_anak_petak', 'kehadiran', 'monitoring', 'ro', 'realisasi'
+    ];
 
-    // Simulate sending changes to server API
-    for (const item of queue) {
-      try {
-        await new Promise(r => setTimeout(r, 400)); // simulate server lag
-        await window.db.dequeueSync(item.id);
-      } catch (err) {
-        console.error('[Sync] Error syncing item ID:', item.id, err);
+    // Build the payload queue
+    let payload = [...queue];
+
+    // On first sync, include ALL local data as 'create' actions
+    if (isFirstSync) {
+      this.showToast('Sinkronisasi awal: mengunggah semua data lokal ke server...', 'warning');
+      for (const storeName of SYNC_STORES) {
+        const all = await window.db.getAllActive(storeName);
+        for (const item of all) {
+          // Only add if not already in queue
+          const alreadyQueued = queue.some(q => q.storeName === storeName && q.payload && q.payload.id === item.id);
+          if (!alreadyQueued) {
+            payload.push({ id: `init_${storeName}_${item.id}`, storeName, action: 'create', payload: item });
+          }
+        }
       }
+      console.log(`[Sync] First sync: pushing ${payload.length} records to server.`);
+    } else if (queue.length > 0) {
+      this.showToast(`Menyinkronkan ${queue.length} perubahan lokal ke server...`, 'warning');
     }
-    
-    this.showToast('Sinkronisasi data selesai!', 'success');
-    this.loadDashboardData();
+
+    if (payload.length === 0 && !isFirstSync) {
+      // Still check for server updates even if nothing to push
+    }
+
+    try {
+      const response = await fetch('api/sync.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ last_sync: lastSync, queue: payload })
+      });
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+      const result = await response.json();
+      if (result.success) {
+        // Hapus antrean lokal yang sukses terkirim (hanya dari sync_queue asli)
+        if (result.synced_ids && result.synced_ids.length > 0) {
+          for (const id of result.synced_ids) {
+            // Hanya hapus yang ada di sync_queue (bukan item init_)
+            const inQueue = queue.find(q => q.id === id);
+            if (inQueue) await window.db.dequeueSync(id);
+          }
+        }
+
+        // Terapkan update dari server ke DB lokal
+        let updateCount = 0;
+        if (result.updates && result.updates.length > 0) {
+          for (const updateGroup of result.updates) {
+            const storeName = updateGroup.storeName;
+            for (const item of updateGroup.items) {
+              if (item.deleted_at) {
+                await window.db.hardDelete(storeName, item.id);
+              } else {
+                await window.db.put(storeName, item);
+              }
+              updateCount++;
+            }
+          }
+        }
+
+        // Simpan timestamp sinkronisasi terbaru
+        await window.db.put('meta', { key: 'last_sync', value: result.last_sync });
+
+        if (payload.length > 0 || updateCount > 0) {
+          this.showToast(`Sinkronisasi selesai! ${updateCount > 0 ? updateCount + ' data baru diterima.' : ''}`, 'success');
+          // Reload view aktif
+          if (this.currentUser && window.DashboardModule) {
+            await window.DashboardModule.render();
+          }
+          if (window.LaporanModule && document.getElementById('laporan-section')?.classList.contains('active')) {
+            await window.LaporanModule.renderReport();
+          }
+        }
+      } else {
+        console.error('[Sync] Server error:', result.message);
+        this.showToast('Gagal sinkronisasi: ' + result.message, 'danger');
+      }
+    } catch (err) {
+      console.error('[Sync] Error during background sync:', err);
+    }
+  }
+
+  /**
+   * Manual sync triggered by user pressing the Sync button in the header.
+   * Selalu reset last_sync ke 0 agar full pull dari MySQL dilakukan.
+   */
+  async manualSync() {
+    const btn = document.getElementById('manualSyncBtn');
+    const icon = document.getElementById('syncBtnIcon');
+    const text = document.getElementById('syncBtnText');
+
+    if (btn) btn.disabled = true;
+    if (icon) icon.textContent = '⏳';
+    if (text) text.textContent = 'Menyinkron...';
+
+    try {
+      // Reset last_sync ke 0 agar full sync (upload semua + download semua dari server)
+      await window.db.put('meta', { key: 'last_sync', value: 0 });
+      await this.triggerBackgroundSync();
+    } finally {
+      if (btn) btn.disabled = false;
+      if (icon) icon.textContent = '🔄';
+      if (text) text.textContent = 'Sinkron';
+    }
   }
 
   /**
@@ -1154,4 +1257,5 @@ class SipenaApp {
 
 // Instantiate globally
 window.app = new SipenaApp();
+window.SipenaApp = window.app;
 window.addEventListener('DOMContentLoaded', () => window.app.init());
