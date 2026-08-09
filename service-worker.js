@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sipena-lite-v65';
+const CACHE_NAME = 'sipena-lite-v81';
 const ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const ASSETS = [
   './js/modules/master-import.js',
   './js/modules/master.js',
   './js/modules/target.js',
+  './js/modules/realisasi.js',
   './js/modules/dashboard.js',
   './js/modules/laporan.js'
 ];
@@ -49,29 +50,23 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Fetch Strategy: Stale-While-Revalidate (offline-first)
+// Fetch Strategy: Network-First for JS/CSS/HTML (falls back to Cache when offline)
 self.addEventListener('fetch', (e) => {
-  // Only handle GET requests and local assets (skip browser extensions, chrome-extension://, api endpoints, etc.)
   if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) {
     return;
   }
 
   e.respondWith(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.match(e.request).then((cachedResponse) => {
-        const fetchedResponse = fetch(e.request).then((networkResponse) => {
-          // If valid response, update the cache copy in background
-          if (networkResponse.status === 200) {
-            cache.put(e.request, networkResponse.clone());
-          }
-          return networkResponse;
-        }).catch(() => {
-          // Silent catch for network failure
-        });
-
-        // Return cache hit, or fallback to network request
-        return cachedResponse || fetchedResponse;
-      });
-    })
+    fetch(e.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(e.request);
+      })
   );
 });

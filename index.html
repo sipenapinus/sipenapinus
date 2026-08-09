@@ -7,7 +7,7 @@
   <title>SIPENA Pinus — Sistem Informasi Pengelolaan Penyadapan Pinus</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#101c15">
-  <link rel="stylesheet" href="css/styles.css?v=10">
+  <link rel="stylesheet" href="css/styles.css?v=13">
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
   <!-- SheetJS for Excel import/export -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -92,6 +92,9 @@
           </div>
         </div>
         <div class="header-actions">
+          <button id="manualSyncBtn" onclick="window.SipenaApp && window.SipenaApp.manualSync()" title="Sinkronisasi data sekarang" style="display:flex;align-items:center;gap:.4rem;padding:.35rem .75rem;border-radius:2rem;border:1px solid var(--border-color);background:var(--bg-surface-elevated);color:var(--text-secondary);font-size:.8rem;cursor:pointer;transition:all .2s;">
+            <span id="syncBtnIcon">🔄</span> <span id="syncBtnText">Sinkron</span>
+          </button>
           <div id="syncIndicator" class="sync-indicator online"><span class="dot blink"></span> Memuat...</div>
         </div>
       </header>
@@ -812,8 +815,7 @@
           <div id="real-belum-setor-panel" style="margin-top:2rem;">
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;">
               <h3 style="font-size:.95rem;color:var(--text-secondary);margin:0;">
-                ⚠️ Penyadap Belum Setor <span style="font-size:.8rem;font-weight:400;">(punya RO tapi belum ada
-                  realisasi)</span>
+                ⚠️ Penyadap Belum Setor <span style="font-size:.8rem;font-weight:400;">(punya RO tapi belum ada realisasi)</span>
               </h3>
               <span id="real-belum-setor-count" class="badge badge-warning" style="font-size:.75rem;">0</span>
             </div>
@@ -843,8 +845,7 @@
         <section id="laporan-section" class="page-section">
           <div class="section-header no-print">
             <h2 class="section-title">Laporan Kerja &amp; Produksi</h2>
-            <p class="section-subtitle">Cetak laporan kerja harian, bulanan, atau rentang tanggal tertentu dengan Kop
-              Resmi</p>
+            <p class="section-subtitle">Cetak laporan kerja harian, bulanan, atau rentang tanggal tertentu dengan Kop Resmi</p>
           </div>
 
           <!-- Filter Toolbar (Sembunyikan saat cetak) -->
@@ -863,13 +864,13 @@
               </div>
               <div class="form-group" style="flex:1;min-width:180px;">
                 <label>Filter RPH</label>
-                <select id="rpt-filter-rph" class="form-control">
+                <select id="rpt-filter-rph" class="form-control" onchange="LaporanModule.renderReport()">
                   <option value="">— Semua RPH —</option>
                 </select>
               </div>
               <div class="form-group" style="flex:1;min-width:180px;">
                 <label>Filter TPG</label>
-                <select id="rpt-filter-tpg" class="form-control">
+                <select id="rpt-filter-tpg" class="form-control" onchange="LaporanModule.renderReport()">
                   <option value="">— Semua TPG —</option>
                 </select>
               </div>
@@ -886,15 +887,15 @@
               <div id="rpt-input-periode" style="display:flex;gap:1rem;flex:2;min-width:280px;">
                 <div class="form-group" style="flex:1;">
                   <label>Bulan</label>
-                  <select id="rpt-bulan" class="form-control">
+                  <select id="rpt-bulan" class="form-control" onchange="LaporanModule.renderReport()">
                     <option value="1">Januari</option>
                     <option value="2">Februari</option>
                     <option value="3">Maret</option>
                     <option value="4">April</option>
                     <option value="5">Mei</option>
                     <option value="6">Juni</option>
-                    <option value="7" selected>Juli</option>
-                    <option value="8">Agustus</option>
+                    <option value="7">Juli</option>
+                    <option value="8" selected>Agustus</option>
                     <option value="9">September</option>
                     <option value="10">Oktober</option>
                     <option value="11">November</option>
@@ -903,7 +904,7 @@
                 </div>
                 <div class="form-group" style="flex:1;">
                   <label>Periode</label>
-                  <select id="rpt-periode" class="form-control">
+                  <select id="rpt-periode" class="form-control" onchange="LaporanModule.renderReport()">
                     <option value="1">Periode 1 (Tgl 1 - 15)</option>
                     <option value="2">Periode 2 (Tgl 16 - Akhir Bulan)</option>
                   </select>
@@ -927,10 +928,8 @@
               </div>
             </div>
 
-            <div
-              style="display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.25rem;border-top:1px solid var(--border-color);padding-top:1rem;">
-              <button class="btn btn-warning" onclick="LaporanModule.generateDemoData()">🔧 Buat Data Demo (Juli
-                2026)</button>
+            <div style="display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.25rem;border-top:1px solid var(--border-color);padding-top:1rem;">
+              <button class="btn btn-warning" onclick="LaporanModule.generateDemoData()">🔧 Buat Data Demo (Juli 2026)</button>
               <button class="btn btn-secondary" onclick="LaporanModule.renderReport()">🔍 Tampilkan Preview</button>
               <button class="btn btn-secondary" onclick="LaporanModule.exportExcel()">📥 Ekspor Excel</button>
               <button class="btn btn-primary" onclick="LaporanModule.printReport()">🖨️ Cetak Laporan (PDF)</button>
@@ -938,87 +937,83 @@
           </div>
 
           <!-- Area Laporan (Ini yang dicetak) -->
-          <div class="card print-container"
-            style="background:#fff;color:#000;padding:2.5rem;border-radius:var(--radius-md);border:1px solid var(--border-color);">
+          <div class="card print-container" style="background:#fff;color:#000;padding:2.5rem;border-radius:var(--radius-md);border:1px solid var(--border-color);">
             <!-- Kop Surat Perhutani -->
-            <div class="kop-surat"
-              style="display:flex;align-items:center;border-bottom:3px double #000;padding-bottom:1rem;margin-bottom:1.5rem;gap:1.5rem;">
+            <div class="kop-surat" style="display:flex;align-items:center;border-bottom:3px double #000;padding-bottom:1rem;margin-bottom:1.5rem;gap:1.5rem;">
               <!-- Logo Perhutani -->
               <div style="width:80px;height:70px;flex-shrink:0;display:flex;align-items:center;">
                 <img src="assets/logo.svg" alt="Logo Perhutani" style="width:100%;height:100%;object-fit:contain;">
               </div>
               <div style="flex-grow:1;text-align:left;">
-                <h3 style="margin:0;font-size:1.15rem;font-weight:700;letter-spacing:0.5px;color:#111;">PERUM PERHUTANI
-                </h3>
+                <h3 style="margin:0;font-size:1.15rem;font-weight:700;letter-spacing:0.5px;color:#111;">PERUM PERHUTANI</h3>
                 <h4 style="margin:2px 0 0 0;font-size:1rem;font-weight:600;color:#222;">DIVISI REGIONAL JAWA TENGAH</h4>
-                <h5 style="margin:2px 0 0 0;font-size:.9rem;font-weight:500;color:#333;" id="kop-kph">KESATUAN
-                  PEMANGKUAN HUTAN (KPH) PEKALONGAN BARAT</h5>
-                <h5 style="margin:2px 0 0 0;font-size:.85rem;font-weight:500;color:#444;" id="kop-bkph">BAGIAN KESATUAN
-                  PEMANGKUAN HUTAN (BKPH) BANTARKAWUNG</h5>
-                <p style="margin:4px 0 0 0;font-size:.75rem;color:#666;font-style:italic;">Alamat: Jl. Raya Bantarkawung
-                  No.10, Brebes 52274</p>
+                <h5 style="margin:2px 0 0 0;font-size:.9rem;font-weight:500;color:#333;" id="kop-kph">KESATUAN PEMANGKUAN HUTAN (KPH) PEKALONGAN BARAT</h5>
+                <h5 style="margin:2px 0 0 0;font-size:.85rem;font-weight:500;color:#444;" id="kop-bkph">BAGIAN KESATUAN PEMANGKUAN HUTAN (BKPH) BANTARKAWUNG</h5>
+                <p style="margin:4px 0 0 0;font-size:.75rem;color:#666;font-style:italic;">Alamat: Jl. Raya Bantarkawung No.10, Brebes 52274</p>
               </div>
             </div>
 
             <!-- Judul Laporan -->
-            <div
-              style="position:relative;min-height:100px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:center;">
+            <div class="report-header-flex" style="display:flex;align-items:center;justify-content:center;position:relative;min-height:90px;margin-bottom:1.5rem;gap:1rem;">
               <!-- Logo Mini Perhutani untuk Buku Sadap -->
-              <div id="rpt-logo-mini"
-                style="display:none;position:absolute;left:0;top:50%;transform:translateY(-50%);width:115px;height:95px;">
+              <div id="rpt-logo-mini" style="display:none;width:80px;height:70px;flex-shrink:0;">
                 <img src="assets/logo.svg" alt="Logo" style="width:100%;height:100%;object-fit:contain;">
               </div>
-              <div style="text-align:center;padding:0 130px;">
-                <h2 id="rpt-title"
-                  style="margin:0;font-size:1.2rem;font-weight:700;color:#111;text-transform:uppercase;line-height:1.45;">
-                  LAPORAN
-                  REALISASI PRODUKSI GETAH</h2>
-                <p id="rpt-tpg-row"
-                  style="display:none;margin:4px 0 0 0;font-size:1rem;font-weight:700;color:#111;text-transform:uppercase;">
-                </p>
-                <p id="rpt-subtitle" style="margin:4px 0 0 0;font-size:.85rem;color:#444;font-weight:500;">Periode: —
-                </p>
+              <div class="report-title-box" style="text-align:center;flex:1;">
+                <h2 id="rpt-title" style="margin:0;font-size:1.15rem;font-weight:700;color:#111;text-transform:uppercase;line-height:1.4;">LAPORAN REALISASI PRODUKSI GETAH</h2>
+                <p id="rpt-tpg-row" style="display:none;margin:4px 0 0 0;font-size:1rem;font-weight:700;color:#111;text-transform:uppercase;"></p>
+                <p id="rpt-subtitle" style="margin:4px 0 0 0;font-size:.85rem;color:#444;font-weight:500;">Periode: —</p>
               </div>
             </div>
+
+            <!-- Ringkasan Master Data untuk Buku Sadap (TPG/RPH/BKPH) -->
+            <div id="rpt-summary-master" style="display:none;margin-bottom:1.25rem;background:#e8f5e9;border-left:4px solid #388e3c;padding:.75rem 1rem;border-radius:4px;font-size:.82rem;color:#1b4d3e;"></div>
 
             <!-- Tabel Laporan -->
             <div class="table-container" style="border:1px solid #ddd;border-radius:4px;overflow-x:auto;">
               <table class="report-table" style="width:100%;border-collapse:collapse;color:#111;font-size:.85rem;">
                 <thead id="rpt-table-head">
-                  <!-- Will be dynamically generated -->
+                  <tr><th>Memuat header...</th></tr>
                 </thead>
                 <tbody id="rpt-table-body">
-                  <tr>
-                    <td style="padding:2rem;color:#666;text-align:center;">Klik "Tampilkan Preview" untuk memuat data
-                      laporan</td>
-                  </tr>
+                  <tr><td style="padding:2rem;color:#666;text-align:center;">Klik "Tampilkan Preview" untuk memuat data</td></tr>
                 </tbody>
               </table>
             </div>
 
-            <!-- Rekap Akumulasi Kehadiran (muncul otomatis di bawah laporan kehadiran) -->
-            <div id="rpt-rekap-kehadiran" style="display:none; margin-top:1rem;"></div>
+            <!-- Container Rekap Akumulasi Kehadiran untuk Buku Sadap -->
+            <div id="rpt-rekap-kehadiran" style="display:none;margin-top:1.5rem;"></div>
 
-            <!-- Ringkasan Master Data TPG/RPH -->
-            <div id="rpt-summary-master" style="display:none; margin-top:1rem; padding:12px 18px; font-size:0.85rem; background:#e8f5e9; border:1px solid #c8e6c9; border-radius:6px; color:#1b4d3e; line-height:1.6;"></div>
-
-            <!-- Legenda Buku Sadapan -->
-            <div id="rpt-legend-pantauan" style="display:none; margin-top:1rem; padding:10px 15px; font-size:0.8rem; background:#f9fbf9; border:1px solid #c8e6c9; border-radius:4px; color:#2e7d32; line-height:1.6;"></div>
-
-            <!-- Tanda Tangan Mandor/Asper -->
-
-            <div
-              style="margin-top:3rem;display:flex;justify-content:space-between;padding:0 2rem;font-size:.85rem;color:#111;">
-              <div style="text-align:center;">
-                <p style="margin-bottom:4.5rem;">Mengetahui,<br><strong>Asper / KBPH Bantarkawung</strong></p>
-                <p style="text-decoration:underline;font-weight:600;" id="rpt-sign-asper">Heri Wibowo</p>
-                <p style="font-size:.75rem;color:#555;" id="rpt-sign-asper-nip">NIP. 197608142002121001</p>
+            <!-- Container Legenda Buku Sadapan -->
+            <div id="rpt-legend-pantauan" style="display:none;margin-top:1rem;background:#f5f5f5;border:1px solid #ddd;padding:0.6rem 0.8rem;border-radius:4px;font-size:0.75rem;color:#333;">
+              <strong>Keterangan Kode Sadapan:</strong><br>
+              <div style="display:flex;flex-wrap:wrap;gap:0.75rem 1.25rem;margin-top:0.3rem;">
+                <span><strong>P1</strong> = Pembaharuan 1</span>
+                <span><strong>P2</strong> = Pembaharuan 2</span>
+                <span><strong>P3</strong> = Pembaharuan 3</span>
+                <span><strong>CS</strong> = Pengecasan/Stimulasi</span>
+                <span><strong>L</strong> = Ludang</span>
+                <span><strong>S. [Kg]</strong> = Setor Getah</span>
+                <span><strong>S</strong> = Sakit</span>
+                <span><strong>I</strong> = Izin</span>
+                <span><strong>A</strong> = Tidak Hadir / Alpa</span>
               </div>
-              <div style="text-align:center;">
-                <p style="margin-bottom:4.5rem;" id="rpt-date-label">Bantarkawung, —<br><strong>Petugas Pembuat
-                    Laporan</strong></p>
-                <p style="text-decoration:underline;font-weight:600;" id="rpt-sign-maker">Budi Santoso</p>
-                <p style="font-size:.75rem;color:#555;" id="rpt-sign-maker-nip">NIP. 198104122005011002</p>
+            </div>
+
+            <!-- Tanda Tangan Laporan -->
+            <div class="rpt-signature-block" style="margin-top:2.5rem;display:flex;justify-content:space-between;page-break-inside:avoid;font-size:.85rem;line-height:1.4;">
+              <div style="text-align:center;min-width:220px;">
+                <div>Mengetahui,</div>
+                <div style="font-weight:600;margin-top:2px;">Asper / KBPH Bantarkawung</div>
+                <div style="height:55px;"></div>
+                <div><strong id="rpt-sign-asper">DWI ANGGONO PUTRA S.Hut</strong></div>
+                <div style="font-size:.78rem;color:#555;" id="rpt-sign-asper-nip">NIP. 194116003</div>
+              </div>
+              <div style="text-align:center;min-width:220px;">
+                <div id="rpt-date-label">Bantarkawung, —<br><strong>Petugas Pembuat Laporan</strong></div>
+                <div style="height:55px;"></div>
+                <div><strong id="rpt-sign-maker">—</strong></div>
+                <div style="font-size:.78rem;color:#555;" id="rpt-sign-maker-nip">—</div>
               </div>
             </div>
           </div>
@@ -2047,24 +2042,24 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Scripts -->
-  <script src="js/seed-data.js?v=3"></script>
-  <script src="js/db.js?v=5"></script>
-  <script src="js/modules/utils.js?v=7"></script>
-  <script src="js/modules/master-bkph.js?v=5"></script>
-  <script src="js/modules/master-rph.js?v=5"></script>
-  <script src="js/modules/master-tpg.js?v=5"></script>
-  <script src="js/modules/master-petak.js?v=8"></script>
-  <script src="js/modules/master-penyadap.js?v=6"></script>
-  <script src="js/modules/master-penugasan.js?v=6"></script>
-  <script src="js/modules/master-anak-petak.js?v=5"></script>
-  <script src="js/modules/master-user.js?v=9"></script>
-  <script src="js/modules/master-import.js?v=9"></script>
-  <script src="js/modules/target.js?v=7"></script>
-  <script src="js/modules/realisasi.js?v=6"></script>
-  <script src="js/modules/dashboard.js?v=28"></script>
-  <script src="js/modules/master.js?v=6"></script>
-  <script src="js/modules/laporan.js?v=40"></script>
-  <script src="js/app.js?v=19"></script>
+  <script src="js/seed-data.js?v=4"></script>
+  <script src="js/db.js?v=6"></script>
+  <script src="js/modules/utils.js?v=8"></script>
+  <script src="js/modules/master-bkph.js?v=6"></script>
+  <script src="js/modules/master-rph.js?v=6"></script>
+  <script src="js/modules/master-tpg.js?v=6"></script>
+  <script src="js/modules/master-petak.js?v=11"></script>
+  <script src="js/modules/master-penyadap.js?v=8"></script>
+  <script src="js/modules/master-penugasan.js?v=8"></script>
+  <script src="js/modules/master-anak-petak.js?v=8"></script>
+  <script src="js/modules/master-user.js?v=10"></script>
+  <script src="js/modules/master-import.js?v=10"></script>
+  <script src="js/modules/target.js?v=14"></script>
+  <script src="js/modules/realisasi.js?v=7"></script>
+  <script src="js/modules/dashboard.js?v=46"></script>
+  <script src="js/modules/master.js?v=7"></script>
+  <script src="js/modules/laporan.js?v=49"></script>
+  <script src="js/app.js?v=34"></script>
 </body>
 
 </html>
