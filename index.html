@@ -1676,8 +1676,12 @@
       </div>
       <form id="penyadap-form" onsubmit="MasterPenyadap.save(event)">
         <input type="hidden" id="penyadap-id">
+        <div class="form-group" id="penyadap-tpg-group" style="display:none;">
+          <label>TPG (Wilayah)</label>
+          <select id="penyadap-tpg" class="form-control"></select>
+        </div>
         <div class="form-group"><label>Nomor Penyadap</label><input id="penyadap-nomor" class="form-control" required
-            placeholder="Contoh: PS-001"></div>
+            placeholder="Contoh: 001 atau PS-001"></div>
         <div class="form-group"><label>Nama Lengkap</label><input id="penyadap-nama" class="form-control" required
             placeholder="Nama penyadap"></div>
         <div class="form-group"><label>Alamat</label><textarea id="penyadap-alamat" class="form-control"
@@ -2049,11 +2053,11 @@
   <script src="js/modules/master-rph.js?v=6"></script>
   <script src="js/modules/master-tpg.js?v=6"></script>
   <script src="js/modules/master-petak.js?v=11"></script>
-  <script src="js/modules/master-penyadap.js?v=8"></script>
-  <script src="js/modules/master-penugasan.js?v=8"></script>
+  <script src="js/modules/master-penyadap.js?v=9"></script>
+  <script src="js/modules/master-penugasan.js?v=10"></script>
   <script src="js/modules/master-anak-petak.js?v=8"></script>
   <script src="js/modules/master-user.js?v=10"></script>
-  <script src="js/modules/master-import.js?v=10"></script>
+  <script src="js/modules/master-import.js?v=11"></script>
   <script src="js/modules/target.js?v=14"></script>
   <script src="js/modules/realisasi.js?v=7"></script>
   <script src="js/modules/dashboard.js?v=46"></script>
