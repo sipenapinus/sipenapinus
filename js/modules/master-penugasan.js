@@ -21,8 +21,38 @@ const MasterPenugasan = (() => {
 
     let data = allPgn;
 
-    if ((role === 'mandor' || role === 'tpg') && scope) {
-      const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
+    if (role === 'mandor' && scope) {
+      const myAssignedPetakIds = new Set(
+        allPetak.filter(p => (p.tpg_id === scope || !p.tpg_id) && p.mandor_id === user.id).map(p => p.id)
+      );
+      if (myAssignedPetakIds.size > 0) {
+        const apIds = allAP.filter(ap => myAssignedPetakIds.has(ap.petak_id)).map(ap => ap.id);
+        data = data.filter(pg => apIds.includes(pg.anak_petak_id) || pg.mandor_id === user.id || pg.created_by === user.id);
+      } else {
+        const apIds = allAP.filter(ap => {
+          const parentPetak = allPetak.find(p => p.id === ap.petak_id);
+          const tpgId = ap.tpg_id || (parentPetak ? parentPetak.tpg_id : '');
+          if (tpgId !== scope) return false;
+          if (parentPetak && parentPetak.mandor_id && parentPetak.mandor_id !== user.id) return false;
+          return true;
+        }).map(ap => ap.id);
+        data = data.filter(pg => apIds.includes(pg.anak_petak_id) || pg.mandor_id === user.id || pg.created_by === user.id);
+      }
+    } else if (role === 'tpg' && scope) {
+      const apIds = allAP.filter(ap => {
+        const parentPetak = allPetak.find(p => p.id === ap.petak_id);
+        return (ap.tpg_id || (parentPetak ? parentPetak.tpg_id : '')) === scope;
+      }).map(ap => ap.id);
+      data = data.filter(pg => apIds.includes(pg.anak_petak_id));
+    } else if (role === 'krph' && scope) {
+      const petakIds = new Set(allPetak.filter(p => p.rph_id === scope).map(p => p.id));
+      const apIds = allAP.filter(ap => petakIds.has(ap.petak_id)).map(ap => ap.id);
+      data = data.filter(pg => apIds.includes(pg.anak_petak_id));
+    } else if (role === 'bkph' && scope) {
+      const allRph = await window.db.getAllActive('rph');
+      const rphIds = new Set(allRph.filter(r => r.bkph_id === scope).map(r => r.id));
+      const petakIds = new Set(allPetak.filter(p => rphIds.has(p.rph_id)).map(p => p.id));
+      const apIds = allAP.filter(ap => petakIds.has(ap.petak_id)).map(ap => ap.id);
       data = data.filter(pg => apIds.includes(pg.anak_petak_id));
     }
 
@@ -96,12 +126,18 @@ const MasterPenugasan = (() => {
       const allUsers = await window.db.getAllActive('users');
       const usersInSameTpg = new Set(allUsers.filter(u => u.scope === scope).map(u => u.id));
 
-      filtered = all.filter(p =>
-        assignedInScope.includes(p.id) ||                         // sudah ditugaskan di wilayah mandor ini
-        p.created_by === user.id  ||                               // dibuat oleh mandor ini
-        usersInSameTpg.has(p.created_by) ||                        // dibuat oleh Mandor TPG di wilayah yang sama
-        (!assignedElsewhere.has(p.id) && p.status === 'aktif')      // belum ditugaskan di wilayah lain & aktif
-      );
+      filtered = all.filter(p => {
+        if (selectedId && (p.id === selectedId || p.nomor === selectedId)) return true;
+        if (p.tpg_id && p.tpg_id !== scope) return false;
+
+        return (
+          p.tpg_id === scope ||
+          assignedInScope.includes(p.id) ||                         // sudah ditugaskan di wilayah mandor ini
+          p.created_by === user.id  ||                               // dibuat oleh mandor ini
+          usersInSameTpg.has(p.created_by) ||                        // dibuat oleh Mandor TPG di wilayah yang sama
+          (!assignedElsewhere.has(p.id) && String(p.status).toLowerCase() === 'aktif')      // belum ditugaskan di wilayah lain & aktif
+        );
+      });
     }
 
     sel.innerHTML = `<option value="">— Pilih Penyadap —</option>` +
@@ -125,29 +161,70 @@ const MasterPenugasan = (() => {
     const allAP    = await window.db.getAllActive('anak_petak');
     const allPetak = await window.db.getAllActive('petak');
     
-    // Filter berdasarkan wilayah kerja Mandor jika user adalah Mandor/TPG
+    // Filter berdasarkan wilayah kerja Mandor jika user adalah Mandor/TPG/KRPH/BKPH
     const user = window.app && window.app.currentUser;
     const role = user ? user.role : '';
     const scope = user ? user.scope : '';
     let filteredAP = allAP;
     
-    if ((role === 'mandor' || role === 'tpg') && scope) {
-      filteredAP = allAP.filter(ap => {
-        if (ap.tpg_id !== scope) return false;
-        if (role === 'mandor' && user) {
+    if (role === 'mandor' && scope) {
+      // 1. Cek apakah ada petak di TPG ini yang secara spesifik sudah di-assign ke Mandor ini
+      const myAssignedPetakIds = new Set(
+        allPetak.filter(p => (p.tpg_id === scope || !p.tpg_id) && p.mandor_id === user.id).map(p => p.id)
+      );
+
+      if (myAssignedPetakIds.size > 0) {
+        // Jika mandor sudah memiliki petak pangkuan definitif (misal: Untung di Bangbayang),
+        // tampilkan hanya petak miliknya agar tidak bercampur dengan mandor lain
+        filteredAP = allAP.filter(ap => {
+          if (selectedId && ap.id === selectedId) return true;
+          return myAssignedPetakIds.has(ap.petak_id);
+        });
+      } else {
+        // Jika belum ada pembagian petak definitif untuk mandor ini di TPG tersebut (atau petak mandor_id belum diisi),
+        // tampilkan semua petak di TPG ini yang belum diambil mandor lain (atau milik mandor ini)
+        filteredAP = allAP.filter(ap => {
+          if (selectedId && ap.id === selectedId) return true;
           const parentPetak = allPetak.find(p => p.id === ap.petak_id);
-          if (!parentPetak || parentPetak.mandor_id !== user.id) return false;
-        }
-        return true;
+          const tpgId = ap.tpg_id || (parentPetak ? parentPetak.tpg_id : '');
+          if (tpgId !== scope) return false;
+          // Petak tidak boleh milik mandor lain
+          if (parentPetak && parentPetak.mandor_id && parentPetak.mandor_id !== user.id) return false;
+          return true;
+        });
+      }
+    } else if (role === 'tpg' && scope) {
+      filteredAP = allAP.filter(ap => {
+        if (selectedId && ap.id === selectedId) return true;
+        const parentPetak = allPetak.find(p => p.id === ap.petak_id);
+        const tpgId = ap.tpg_id || (parentPetak ? parentPetak.tpg_id : '');
+        return tpgId === scope;
+      });
+    } else if (role === 'krph' && scope) {
+      filteredAP = allAP.filter(ap => {
+        if (selectedId && ap.id === selectedId) return true;
+        const parentPetak = allPetak.find(p => p.id === ap.petak_id);
+        return parentPetak && parentPetak.rph_id === scope;
+      });
+    } else if (role === 'bkph' && scope) {
+      const allRph = await window.db.getAllActive('rph');
+      const rphIds = new Set(allRph.filter(r => r.bkph_id === scope).map(r => r.id));
+      filteredAP = allAP.filter(ap => {
+        if (selectedId && ap.id === selectedId) return true;
+        const parentPetak = allPetak.find(p => p.id === ap.petak_id);
+        return parentPetak && rphIds.has(parentPetak.rph_id);
       });
     }
 
     // Cache the list of option data
     cachedAnakPetak = filteredAP.map(ap => {
       const p = allPetak.find(x => x.id === ap.petak_id);
-      const label = p ? `Petak ${p.nomor} (${ap.luas_ha || 0} ha)` : ap.huruf;
+      const label = p ? `Petak ${p.nomor}${ap.huruf ? ' ' + ap.huruf : ''} (${ap.luas_ha || 0} ha)` : ap.huruf;
       return { id: ap.id, label: label };
     });
+
+    // Natural sort agar urutan petak rapi (1, 2, ..., 10, dsb)
+    cachedAnakPetak.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }));
 
     // Populate initially
     renderAnakPetakOptions(sel, selectedId);
@@ -207,11 +284,15 @@ const MasterPenugasan = (() => {
       return;
     }
 
+    const user = window.app && window.app.currentUser;
+    const role = user ? user.role : '';
+
     const aktif = parseInt(document.getElementById('pgn-aktif').value);
     const record = {
       id, 
       penyadap_id, 
       anak_petak_id: ap_id, 
+      mandor_id: role === 'mandor' && user ? user.id : (existing && existing.mandor_id ? existing.mandor_id : null),
       persen_target: existing ? existing.persen_target : 100,
       jumlah_pohon: existing ? existing.jumlah_pohon : 0,
       tanggal_mulai:  existing ? existing.tanggal_mulai : U().today(),
@@ -223,6 +304,21 @@ const MasterPenugasan = (() => {
 
     await window.db.put('penugasan', record);
     await window.db.queueSync('penugasan', existing ? 'update' : 'create', record);
+
+    // Jika petak ini belum memiliki mandor_id dan yang menugaskan adalah mandor sadap,
+    // update mandor_id di petak agar secara otomatis terhubung
+    if (role === 'mandor' && user) {
+      const ap = await window.db.get('anak_petak', ap_id);
+      if (ap && ap.petak_id) {
+        const parentPetak = await window.db.get('petak', ap.petak_id);
+        if (parentPetak && !parentPetak.mandor_id) {
+          parentPetak.mandor_id = user.id;
+          await window.db.put('petak', parentPetak);
+          await window.db.queueSync('petak', 'update', parentPetak);
+        }
+      }
+    }
+
     U().closeModal('penugasan-modal');
     U().showToast(existing ? 'Penugasan diperbarui' : 'Penugasan berhasil ditambahkan');
     state.page = 1;

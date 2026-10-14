@@ -673,15 +673,40 @@ const MasterImport = (() => {
       errors.push(_err(rowNum, 'status', `Status tidak valid: "${row.status}". Pilih: aktif | tidak_aktif | pindah | berhenti`));
     }
 
-    // Deteksi duplikat dalam file yang sama
-    if (nomorKey && seenInSheet.has(nomorKey)) {
-      errors.push(_err(rowNum, 'nomor', `Nomor "${nomorKey}" muncul lebih dari sekali dalam file Excel. Periksa apakah baris contoh template sudah dihapus.`));
-    } else if (nomorKey) {
-      seenInSheet.add(nomorKey);
+    // Tentukan TPG target impor
+    const currentUser = window.app && window.app.currentUser;
+    const actorUser = data.users_all ? data.users_all.find(u => u.id === actor) : null;
+    const activeUser = currentUser || actorUser;
+    let tpgId = '';
+
+    // Cek jika ada kolom kode_tpg di Excel
+    if (row.kode_tpg || row.tpg_id || row.tpg) {
+      const val = String(row.kode_tpg || row.tpg_id || row.tpg).trim().toUpperCase();
+      const matched = data.tpg_all.find(t => t.id === val || (t.kode && t.kode.toUpperCase() === val) || (t.nama && t.nama.toUpperCase() === val));
+      if (matched) tpgId = matched.id;
     }
 
-    // Upsert: jika nomor sudah ada → update data lama, bukan error
-    const existing = data.penyadap_all.find(r => r.nomor === nomorKey);
+    // Jika tidak ada di file, ambil dari scope user yang login (Mandor/TPG)
+    if (!tpgId && activeUser && (activeUser.role === 'mandor' || activeUser.role === 'tpg') && activeUser.scope) {
+      tpgId = activeUser.scope;
+    }
+
+    // Deteksi duplikat dalam file yang sama (unik per TPG)
+    const sheetKey = (tpgId ? tpgId + '_' : '') + nomorKey;
+    if (nomorKey && seenInSheet.has(sheetKey)) {
+      errors.push(_err(rowNum, 'nomor', `Nomor "${nomorKey}" muncul lebih dari sekali dalam file Excel. Periksa apakah baris contoh template sudah dihapus.`));
+    } else if (nomorKey) {
+      seenInSheet.add(sheetKey);
+    }
+
+    // Upsert per TPG: cari penyadap dengan nomor sama HANYA di TPG yang sama
+    const existing = data.penyadap_all.find(r => {
+      if (r.nomor !== nomorKey) return false;
+      const rTpg = r.tpg_id || (r.created_by && data.users_all && (data.users_all.find(u => u.id === r.created_by)?.scope));
+      if (tpgId && rTpg) return rTpg === tpgId;
+      if (r.created_by && r.created_by === actor) return true;
+      return false;
+    });
 
     if (errors.length) return { errors };
     return { record: {
@@ -691,6 +716,7 @@ const MasterImport = (() => {
       alamat: String(row.alamat || '').trim(),
       no_hp: String(row.no_hp || '').trim(),
       status,
+      tpg_id: tpgId || (existing ? existing.tpg_id : null),
       ...U().makeAudit(actor, existing)
     }};
   }

@@ -1,7 +1,8 @@
 /**
  * SIPENA Lite — Master Penyadap
- * Business Rule: Data penyadap TIDAK BOLEH dihapus permanen.
- * Hanya boleh ubah status.
+ * Business Rule: 
+ * - Nomor penyadap unik PER TPG (bukan global satu KPH), sehingga Mandor berbeda bisa menggunakan no. 001, 002, dst.
+ * - Data penyadap TIDAK BOLEH dihapus permanen, hanya boleh ubah status.
  */
 'use strict';
 
@@ -10,8 +11,31 @@ const MasterPenyadap = (() => {
 
   let state = { search: '', sortKey: 'nama', sortDir: 'asc', filterStatus: '', page: 1 };
 
+  function resolvePenyadapTpg(p, allUsers, allPgn, allAP) {
+    if (p.tpg_id) return p.tpg_id;
+    if (p.created_by && allUsers) {
+      const u = allUsers.find(x => x.id === p.created_by);
+      if (u && (u.role === 'mandor' || u.role === 'tpg') && u.scope) {
+        return u.scope;
+      }
+    }
+    if (allPgn && allAP) {
+      const pgn = allPgn.find(pg => pg.penyadap_id === p.id);
+      if (pgn) {
+        const ap = allAP.find(a => a.id === pgn.anak_petak_id);
+        if (ap && ap.tpg_id) return ap.tpg_id;
+      }
+    }
+    return '';
+  }
+
   async function render() {
     const all = await window.db.getAllActive('penyadap_master');
+    const allTpg = await window.db.getAllActive('tpg');
+    const allUsers = await window.db.getAllActive('users');
+    const allPgn = await window.db.getAllActive('penugasan');
+    const allAP = await window.db.getAllActive('anak_petak');
+
     let data  = all;
 
     const user = window.app && window.app.currentUser;
@@ -19,19 +43,19 @@ const MasterPenyadap = (() => {
     const scope = user ? user.scope : '';
 
     if ((role === 'mandor' || role === 'tpg') && scope) {
-      const allPgn = await window.db.getAllActive('penugasan');
-      const allAP = await window.db.getAllActive('anak_petak');
       const apIds = allAP.filter(ap => ap.tpg_id === scope).map(ap => ap.id);
       const assignedPndIds = allPgn.filter(pg => pg.aktif === 1 && apIds.includes(pg.anak_petak_id)).map(pg => pg.penyadap_id);
-      
-      const allUsers = await window.db.getAllActive('users');
       const usersInSameTpg = new Set(allUsers.filter(u => u.scope === scope).map(u => u.id));
 
-      data = all.filter(p => 
-        assignedPndIds.includes(p.id) || 
-        p.created_by === user.id || 
-        usersInSameTpg.has(p.created_by)
-      );
+      data = all.filter(p => {
+        const pTpg = resolvePenyadapTpg(p, allUsers, allPgn, allAP);
+        if (pTpg) return pTpg === scope;
+        return (
+          assignedPndIds.includes(p.id) || 
+          p.created_by === user.id || 
+          usersInSameTpg.has(p.created_by)
+        );
+      });
     }
 
     if (state.filterStatus) data = data.filter(r => r.status === state.filterStatus);
@@ -47,8 +71,15 @@ const MasterPenyadap = (() => {
       tbody.innerHTML = pager.rows.map(row => {
         const badge = U().STATUS_PENYADAP_BADGE[row.status] || 'badge-inactive';
         const label = U().STATUS_PENYADAP_LABEL[row.status] || row.status;
+        const rowTpgId = resolvePenyadapTpg(row, allUsers, allPgn, allAP);
+        const tpgObj = allTpg.find(t => t.id === rowTpgId);
+        const tpgBadge = tpgObj ? `<div class="text-muted-sm">${tpgObj.nama}</div>` : '';
+
         return `<tr>
-          <td><strong>${row.nomor}</strong></td>
+          <td>
+            <strong>${row.nomor}</strong>
+            ${role === 'admin' ? tpgBadge : ''}
+          </td>
           <td>${row.nama}</td>
           <td style="color:var(--text-secondary)">${row.alamat || '—'}</td>
           <td>${row.no_hp || '—'}</td>
@@ -66,10 +97,30 @@ const MasterPenyadap = (() => {
     U().renderPagination(document.getElementById('penyadap-pagination'), pager, p => { state.page = p; render(); });
   }
 
-  function openAdd() {
+  async function _loadTpgSelect(selectedTpgId = '') {
+    const group = document.getElementById('penyadap-tpg-group');
+    const sel   = document.getElementById('penyadap-tpg');
+    if (!group || !sel) return;
+
+    const user = window.app && window.app.currentUser;
+    const role = user ? user.role : '';
+
+    if (role === 'admin') {
+      group.style.display = 'block';
+      const allTpg = await window.db.getAllActive('tpg');
+      sel.innerHTML = `<option value="">— Pilih TPG —</option>` +
+        allTpg.map(t => `<option value="${t.id}" ${t.id === selectedTpgId ? 'selected' : ''}>${t.nama}</option>`).join('');
+    } else {
+      group.style.display = 'none';
+      sel.innerHTML = '';
+    }
+  }
+
+  async function openAdd() {
     document.getElementById('penyadap-form').reset();
     document.getElementById('penyadap-id').value = '';
     document.getElementById('penyadap-modal-title').textContent = 'Tambah Penyadap';
+    await _loadTpgSelect();
     U().openModal('penyadap-modal');
   }
 
@@ -83,6 +134,7 @@ const MasterPenyadap = (() => {
     document.getElementById('penyadap-hp').value         = row.no_hp || '';
     document.getElementById('penyadap-status').value     = row.status;
     document.getElementById('penyadap-modal-title').textContent = 'Edit Penyadap';
+    await _loadTpgSelect(row.tpg_id || '');
     U().openModal('penyadap-modal');
   }
 
@@ -100,17 +152,50 @@ const MasterPenyadap = (() => {
     const existing = await window.db.get('penyadap_master', id);
     const nomor    = document.getElementById('penyadap-nomor').value.trim().toUpperCase();
 
-    // Validasi: nomor unik
-    const all = await window.db.getAllActive('penyadap_master');
-    const dup = all.find(r => r.nomor === nomor && r.id !== id);
-    if (dup) { U().showToast(`Nomor penyadap ${nomor} sudah terdaftar`, 'danger'); return; }
+    const user  = window.app && window.app.currentUser;
+    const role  = user ? user.role : '';
+    const scope = user ? user.scope : '';
+
+    let targetTpgId = '';
+    const tpgSel = document.getElementById('penyadap-tpg');
+    if (tpgSel && tpgSel.value) {
+      targetTpgId = tpgSel.value;
+    } else if ((role === 'mandor' || role === 'tpg') && scope) {
+      targetTpgId = scope;
+    } else if (existing && existing.tpg_id) {
+      targetTpgId = existing.tpg_id;
+    }
+
+    // Validasi: nomor unik per TPG (bukan global seluruh KPH)
+    const all       = await window.db.getAllActive('penyadap_master');
+    const allUsers = await window.db.getAllActive('users');
+    const allPgn   = await window.db.getAllActive('penugasan');
+    const allAP    = await window.db.getAllActive('anak_petak');
+
+    const dup = all.find(r => {
+      if (r.id === id) return false;
+      if (r.nomor !== nomor) return false;
+      const rTpg = resolvePenyadapTpg(r, allUsers, allPgn, allAP);
+      if (targetTpgId && rTpg) {
+        return rTpg === targetTpgId;
+      }
+      if (r.created_by && user && r.created_by === user.id) return true;
+      return false;
+    });
+
+    if (dup) {
+      U().showToast(`Nomor penyadap ${nomor} sudah terdaftar di TPG ini`, 'danger');
+      return;
+    }
 
     const record = {
-      id, nomor,
+      id, 
+      nomor,
       nama:   document.getElementById('penyadap-nama').value.trim(),
       alamat: document.getElementById('penyadap-alamat').value.trim(),
       no_hp:  document.getElementById('penyadap-hp').value.trim(),
       status: document.getElementById('penyadap-status').value,
+      tpg_id: targetTpgId || null,
       ...U().makeAudit(U().currentActorId(), existing)
     };
 
@@ -128,10 +213,23 @@ const MasterPenyadap = (() => {
   async function exportExcel() {
     if (typeof XLSX === 'undefined') { U().showToast('Library Excel belum tersedia', 'danger'); return; }
     const all = await window.db.getAllActive('penyadap_master');
-    const rows = all.map(r => ({
-      Nomor: r.nomor, Nama: r.nama, Alamat: r.alamat || '',
-      No_HP: r.no_hp || '', Status: r.status
-    }));
+    const allTpg = await window.db.getAllActive('tpg');
+    const allUsers = await window.db.getAllActive('users');
+    const allPgn = await window.db.getAllActive('penugasan');
+    const allAP = await window.db.getAllActive('anak_petak');
+
+    const rows = all.map(r => {
+      const rTpgId = resolvePenyadapTpg(r, allUsers, allPgn, allAP);
+      const tpgObj = allTpg.find(t => t.id === rTpgId);
+      return {
+        Nomor: r.nomor,
+        Nama: r.nama,
+        TPG: tpgObj ? tpgObj.nama : '',
+        Alamat: r.alamat || '',
+        No_HP: r.no_hp || '',
+        Status: r.status
+      };
+    });
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Master Penyadap');
@@ -139,7 +237,7 @@ const MasterPenyadap = (() => {
     U().showToast('Export Excel berhasil');
   }
 
-  return { render, openAdd, openEdit, confirmDelete, save, onSearch, onFilter, exportExcel };
+  return { render, openAdd, openEdit, confirmDelete, save, onSearch, onFilter, exportExcel, resolvePenyadapTpg };
 })();
 
 window.MasterPenyadap = MasterPenyadap;
